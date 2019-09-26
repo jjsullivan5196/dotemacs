@@ -1,0 +1,232 @@
+#+TITLE: John's emacs config
+
+* Basics
+** Configure default behavior
+#+BEGIN_SRC emacs-lisp
+  ;; ahhhhhhhhhhhhh
+  (setq ring-bell-function 'ignore)
+
+  ;; backups
+  (setq backup-directory-alist '(("." . "~/.emacs.d/backup"))
+        backup-by-copying t    ; Don't delink hardlinks
+        version-control t      ; Use version numbers on backups
+        delete-old-versions t  ; Automatically delete excess backups
+        kept-new-versions 20   ; how many of the newest versions to keep
+        kept-old-versions 5    ; and how many of the old
+        )
+
+  ;; colors!
+  (load-theme 'wombat)
+
+  ;; Shrink fringes to 1 pixel.
+  (fringe-mode 1)
+
+  ;; font size
+  (set-face-attribute 'default nil :height 120)
+
+  ;; flat modeline
+  (set-face-attribute 'mode-line nil :box nil)
+  (set-face-attribute 'mode-line-inactive nil :box nil)
+
+  ;; turn off stupid bars (in order of greatest annoyance)
+  (tool-bar-mode -1)
+  (menu-bar-mode -1)
+  (scroll-bar-mode -1)
+
+  ;; modeline time
+  ;; (setq display-time-default-load-average nil)
+  ;; (setq display-time-format "%b %d %Y %H:%M")
+  ;; (display-time-mode 1)
+  ;; (display-battery-mode 1)
+
+  ;; line numbers
+  (add-hook 
+    'prog-mode-hook 
+    (lambda ()
+      (display-line-numbers-mode)
+      (setq display-line-numbers 'relative)))
+
+  ;; self-care
+  (setq inhibit-startup-screen t)
+  (setq inhibit-startup-echo-area-message "This aint your dad's spacemacs")
+  (setq initial-scratch-message ";; 頑張って!\n\n")
+
+  ;; add user modules to load path
+  (add-to-list 'load-path (expand-file-name "vendor"
+                                            user-emacs-directory))
+
+  ;; enable package manager
+  (require 'straight-init)
+#+END_SRC
+
+** Editor stuff
+#+BEGIN_SRC emacs-lisp
+  (use-package frames-only-mode
+    :config (frames-only-mode 1))  
+
+  (use-package which-key
+    :config (which-key-mode 1))
+
+  (use-package undo-tree
+    :config (global-undo-tree-mode 1))
+
+  (use-package ivy
+    :config
+    (ivy-mode 1))
+
+  (use-package counsel
+    :after (ivy)
+    :config 
+    (counsel-mode 1))
+
+  (use-package swiper
+    :after (ivy)
+    :config (global-set-key [remap isearch-forward] 'swiper))
+
+  (use-package company
+    :config (global-company-mode 1))
+#+END_SRC
+
+** IDE things
+#+BEGIN_SRC emacs-lisp
+  (use-package flycheck
+    :config (global-flycheck-mode 1))
+
+  (use-package expand-region
+    :bind ("C-." . 'er/expand-region))
+
+  (use-package projectile)
+
+  (use-package magit)  
+#+END_SRC
+
+** Evil
+#+BEGIN_SRC emacs-lisp
+  (use-package evil
+    :after undo-tree
+    :init
+    (setq evil-want-keybinding nil)
+    (setq evil-want-integration t)
+    :config (evil-mode 1))
+
+  (use-package evil-surround
+    :after evil
+    :config (global-evil-surround-mode 1))
+
+  (use-package evil-collection
+    :after evil
+    :config (evil-collection-init))
+
+  (use-package evil-magit
+    :after evil)
+#+END_SRC
+
+
+#+BEGIN_SRC emacs-lisp
+  (use-package w3m
+    :config (setq browse-url-browser-function 'w3m-browse-url))
+
+  (use-package web-search
+    :after w3m
+    :init (setq web-search-default-provider "DuckDuckGo")
+    :bind ("C-c w" . web-search))
+
+#+END_SRC
+
+** Eshell
+#+BEGIN_SRC emacs-lisp
+  (require 'eshell)
+
+  (defun eshell/clear ()
+    "Actually clear eshell"
+    (interactive)
+    (let ((inhibit-read-only t))
+      (erase-buffer)))
+#+END_SRC
+** Helping hands
+#+BEGIN_SRC emacs-lisp
+  (defun from-userdir (path)
+    "Expand relative PATH from `user-emacs-directory`"
+    (expand-file-name path user-emacs-directory))
+
+  (defun edit-user-config ()
+    "Edit the main configuration file"
+    (interactive)
+    (find-file-other-frame user-config-source-file))
+
+  (defun config-reinit ()
+    "Reload init.el"
+    (interactive)
+    (load (from-userdir "init.el")))
+
+  (defmacro make-alias (var &rest syms)
+    "Alias all of SYMS to VAR"
+    (append '(progn)
+            (mapcar (lambda (s) (list 'defvaralias s var)) syms)))
+#+END_SRC
+
+* Programming
+** General
+#+BEGIN_SRC emacs-lisp
+  (setq-default indent-tabs-mode nil
+                tab-width 2)
+
+  (make-alias 'tab-width 'standard-indent 
+                         'sh-basic-offset)
+
+  (use-package rainbow-delimiters
+    :hook ((prog-mode . rainbow-delimiters-mode)))
+
+  (use-package smartparens
+    :hook ((prog-mode . smartparens-strict-mode)))
+
+  (use-package evil-smartparens
+    :after (evil smartparens)
+    :hook ((smartparens-enabled . evil-smartparens-mode)))
+
+  (use-package aggressive-indent
+    :hook ((prog-mode . aggressive-indent-mode)))
+#+END_SRC
+
+** Markup
+#+BEGIN_SRC emacs-lisp
+  (use-package yaml-mode
+    :mode "\\.yml\\'")
+#+END_SRC
+
+** Lisp
+TODO make this not a joke
+#+BEGIN_SRC emacs-lisp
+#+END_SRC
+
+** Javascript
+#+BEGIN_SRC emacs-lisp
+  (use-package rjsx-mode
+    :mode (("\\.js\\'"  . rjsx-mode)
+	         ("\\.ts\\'"  . rjsx-mode)
+	         ("\\.tsx\\'" . rjsx-mode))
+    :config (setq js2-strict-missing-semi-warning nil))
+
+  (use-package tide
+    :after (rjsx-mode flycheck)
+    :hook ((rjsx-mode . tide-setup)
+	   (rjsx-mode . tide-hl-identifier-mode)))
+#+END_SRC
+
+* Keys
+#+BEGIN_SRC emacs-lisp
+  ;; Just kill buffer
+  (global-set-key [remap kill-buffer] 'kill-this-buffer)
+
+  ;; Ibuffer
+  (global-set-key [remap list-buffers] 'ibuffer)
+
+  ;; Font size
+  (global-set-key (kbd "C-=") 'text-scale-increase)
+  (global-set-key (kbd "C--") 'text-scale-decrease)
+  (global-set-key (kbd "C-+") (lambda () (interactive) (text-scale-set 0)))
+
+  ;; Config stuff
+  (global-set-key (kbd "<f9>") 'config-reinit)
+  (global-set-key (kbd "<f12>") 'edit-user-config)
+#+END_SRC
