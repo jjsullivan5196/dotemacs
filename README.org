@@ -1,0 +1,35 @@
+** My (pretty small) emacs config
+
+This is my first try at making a fairly-detailed emacs config by hand. I've had
+previous experience with spacemacs, but (for me) it was kinda sluggish and I
+didn't really understand all the things they were doing under the hood.
+
+I started with this config so I could have a good grip on everything I was
+adding to the editor. I also show a preference in here for idiomatic and
+declarative configuration, use of helper modules provided by the community (such
+as the [[https://github.com/raxod502/straight.el][straight package manager]]), and neatly-kept passages using ~org-tangle~.
+
+** Some 'features'
+
+ - An inital configuration to make emacs a bit more modern looking and less
+   annoying, without bloating it to death
+ - Packages installed and configured with [[https://github.com/raxod502/straight.el][straight]] and [[https://github.com/jwiegley/use-package][use-package]]
+ - Decent amount of configured packages for everyday things (programming
+   helpers, completion with ivy/company, magit)
+ - Modal editing and quick motion/selection with [[https://github.com/emacs-evil][evil-mode]] and companion
+   packages
+ - Never forget another key chord with [[https://github.com/justbur/emacs-which-key][which-key]]
+ - Some helper functions for getting around quick, one key to open conifg file
+   in new frame
+
+There's still a lot of work to be done here, but the foundation is pretty much
+set.  If you're looking for a good starting point for a configuration you want
+to maintain by yourself, feel free to browse thru
+~vendor/user-config.org~. ~init.el~ contains an incredibly simple bootstrap for
+a literate config file, so it's probably the best thing you can steal from here
+:-)
+
+** License
+
+The entirety of this repo is available under the MIT license in ~LICENSE.txt~,
+so feel free to use any of it for your desired purposes.

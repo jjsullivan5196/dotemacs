@@ -46,6 +46,9 @@
       (display-line-numbers-mode)
       (setq display-line-numbers 'relative)))
 
+  ;; line flow
+  (setq-default fill-column 80)
+
   ;; self-care
   (setq inhibit-startup-screen t)
   (setq inhibit-startup-echo-area-message "This aint your dad's spacemacs")
