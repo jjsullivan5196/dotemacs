@@ -58,6 +58,10 @@
   (add-to-list 'load-path (expand-file-name "vendor"
                                             user-emacs-directory))
 
+  ;; org-mode
+  (require 'org)
+  (setq-default org-confirm-babel-evaluate nil)
+
   ;; enable package manager
   (require 'straight-init)
 #+END_SRC
@@ -90,6 +94,12 @@
     :config (global-company-mode 1))
 #+END_SRC
 
+** PDF
+#+BEGIN_SRC emacs-lisp
+  (use-package pdf-tools
+    :mode (("\\.pdf\\'" . pdf-tools))
+    :config (pdf-loader-install))
+#+END_SRC
 ** IDE things
 #+BEGIN_SRC emacs-lisp
   (use-package flycheck
@@ -181,7 +191,10 @@
     :hook ((prog-mode . rainbow-delimiters-mode)))
 
   (use-package smartparens
-    :hook ((prog-mode . smartparens-strict-mode)))
+    :hook ((prog-mode . smartparens-strict-mode))
+    :bind (:map smartparens-mode-map
+                ("C-c l" . sp-forward-slurp-sexp)
+                ("C-c h" . sp-forward-barf-sexp)))
 
   (use-package evil-smartparens
     :after (evil smartparens)
@@ -198,8 +211,11 @@
 #+END_SRC
 
 ** Lisp
-TODO make this not a joke
 #+BEGIN_SRC emacs-lisp
+  (use-package cider
+    :init
+    (setq-default clojure-indent-style 'align-arguments)
+    (require 'ob-clojure))
 #+END_SRC
 
 ** Javascript
