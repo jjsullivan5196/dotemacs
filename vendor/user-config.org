@@ -254,6 +254,7 @@
   (use-package cider
     :init
     (setq-default clojure-indent-style 'align-arguments)
+    (setq org-babel-clojure-backend 'cider)
     (require 'ob-clojure))
 
   (use-package lispy
