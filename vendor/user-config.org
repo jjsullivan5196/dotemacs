@@ -117,7 +117,9 @@
 
   (use-package swiper
     :after (ivy)
-    :config (global-set-key [remap isearch-forward] 'swiper))
+    :config
+    (global-set-key [remap isearch-forward] 'swiper-isearch)
+    (global-set-key [remap isearch-backward] 'swiper-isearch-backward))
 
   (use-package company
     :config (global-company-mode 1))
