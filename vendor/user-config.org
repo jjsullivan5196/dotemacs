@@ -174,10 +174,9 @@
     :after evil)
 #+END_SRC
 
-
+** Innernet
 #+BEGIN_SRC emacs-lisp
-  (use-package w3m
-    :config (setq browse-url-browser-function 'w3m-browse-url))
+  (use-package w3m)
 
   (use-package web-search
     :after w3m
@@ -185,6 +184,9 @@
     :bind ("C-c w" . web-search))
 
 #+END_SRC
+
+#+RESULTS:
+: web-search
 
 ** Eshell
 #+BEGIN_SRC emacs-lisp
@@ -229,9 +231,6 @@
 
   (use-package rainbow-delimiters
     :hook ((prog-mode . rainbow-delimiters-mode)))
-
-  (use-package aggressive-indent
-    :hook ((prog-mode . aggressive-indent-mode)))
 
   (use-package smartparens
     :hook ((non-sexp-mode . smartparens-strict-mode))
@@ -278,6 +277,18 @@
     :after (rjsx-mode flycheck)
     :hook ((rjsx-mode . tide-setup)
 	   (rjsx-mode . tide-hl-identifier-mode)))
+#+END_SRC
+
+* Snake
+#+BEGIN_SRC emacs-lisp
+  (setq python-indent-offset 2)
+
+  (use-package pipenv
+    :hook (python-mode . pipenv-mode)
+    :init
+    (setq
+     pipenv-projectile-after-switch-function
+     #'pipenv-projectile-after-switch-extended)) 
 #+END_SRC
 
 * Keys
