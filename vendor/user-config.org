@@ -1,32 +1,18 @@
 #+TITLE: John's emacs config
 
 * My settings
-** Toggles
 #+BEGIN_SRC emacs-lisp
-  (defvar want-evil t
+  (defvar want-evil nil
     "evil-mode on startup.")
 
   (defvar want-lispy t
     "lispy in lisp-modes")
-#+END_SRC
 
-** Others
-#+BEGIN_SRC emacs-lisp
   (defvar sexp-modes '(clojure-mode
                        emacs-lisp-mode
+                       lisp-interaction-mode
                        lisp-mode)
     "Editing modes that use sexp/lisp syntax")
-
-#+END_SRC
-
-** Custom hooks
-#+BEGIN_SRC emacs-lisp
-  (defvar non-sexp-mode-hook nil
-    "This hook will be invoked when a non-lisp language mode is used.")
-
-  (add-hook 'prog-mode-hook (lambda ()
-                              (unless (member major-mode sexp-modes)
-                                (run-hooks 'non-sexp-mode-hook))))
 #+END_SRC
 
 * Basics
@@ -98,6 +84,19 @@
   (require 'straight-init)
 #+END_SRC
 
+** Custom hooks
+#+BEGIN_SRC emacs-lisp
+  (defvar non-sexp-mode-hook nil
+    "This hook will be invoked when a non-lisp language mode is used.")
+
+  (defvar sexp-mode-hook nil
+    "Hook for lisp-dialect language modes")
+
+  (add-hook 'prog-mode-hook (lambda ()
+                              (run-hooks (if (member major-mode sexp-modes)
+                                             'sexp-mode-hook 'non-sexp-mode-hook))))
+#+END_SRC
+
 ** Keys
 #+BEGIN_SRC emacs-lisp
   ;; Just kill buffer
@@ -115,6 +114,7 @@
   (global-set-key (kbd "<f9>") 'config-reinit)
   (global-set-key (kbd "<f12>") 'edit-user-config)
 #+END_SRC
+
 ** Editor stuff
 #+BEGIN_SRC emacs-lisp
   (use-package frames-only-mode
@@ -148,6 +148,18 @@
     :straight (sunrise :type git
                        :host github
                        :repo "sunrise-commander/sunrise-commander"))
+#+END_SRC
+
+** Markup
+#+BEGIN_SRC emacs-lisp
+  (use-package yaml-mode
+    :mode "\\.yml\\'")
+
+  (use-package markdown-mode
+    :mode "\\.md\\'"
+    :config
+    (setq-default markdown-hide-markup t
+                  markdown-hide-urls t))
 #+END_SRC
 
 ** Eshell
@@ -241,9 +253,7 @@
 
   (use-package smartparens
     :hook ((non-sexp-mode . smartparens-strict-mode))
-    :bind (:map smartparens-mode-map
-                ("C-c l" . sp-forward-slurp-sexp)
-                ("C-c h" . sp-forward-barf-sexp)))
+    :config (sp-use-smartparens-bindings))
 
   (use-package evil-smartparens
     :if want-evil
@@ -270,12 +280,6 @@
     :mode "\\.nix\\'")
 #+END_SRC
 
-** Markup
-#+BEGIN_SRC emacs-lisp
-  (use-package yaml-mode
-    :mode "\\.yml\\'")
-#+END_SRC
-
 ** Lisp
 #+BEGIN_SRC emacs-lisp
   (use-package cider
@@ -286,11 +290,9 @@
 
   (use-package lispy
     :if want-lispy
-    :hook ((lisp-mode . lispy-mode)
-           (emacs-lisp-mode . lispy-mode)
-           (clojure-mode . lispy-mode))
+    :hook ((sexp-mode . lispy-mode))
     :config
-    (add-to-list 'evil-emacs-state-modes 'lispy-mode))
+    (if want-evil (add-to-list 'evil-emacs-state-modes 'lispy-mode)))
 #+END_SRC
 
 ** Javascript
@@ -304,7 +306,7 @@
   (use-package tide
     :after (rjsx-mode flycheck)
     :hook ((rjsx-mode . tide-setup)
-	   (rjsx-mode . tide-hl-identifier-mode)))
+	         (rjsx-mode . tide-hl-identifier-mode)))
 #+END_SRC
 
 ** Snake
