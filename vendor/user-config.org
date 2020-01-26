@@ -133,20 +133,9 @@
 ** PDF
 #+BEGIN_SRC emacs-lisp
   (use-package pdf-tools
+    :disabled
     :mode (("\\.pdf\\'" . pdf-tools))
     :config (pdf-loader-install))
-#+END_SRC
-** IDE things
-#+BEGIN_SRC emacs-lisp
-  (use-package flycheck
-    :config (global-flycheck-mode 1))
-
-  (use-package expand-region
-    :bind ("C-." . 'er/expand-region))
-
-  (use-package projectile)
-
-  (use-package magit)  
 #+END_SRC
 
 ** Evil
