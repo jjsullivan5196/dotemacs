@@ -62,6 +62,9 @@
   (menu-bar-mode -1)
   (scroll-bar-mode -1)
 
+  ;; truncate minibuffer display
+  (setq message-truncate-lines t)
+
   ;; modeline time
   ;; (setq display-time-default-load-average nil)
   ;; (setq display-time-format "%b %d %Y %H:%M")
@@ -95,6 +98,23 @@
   (require 'straight-init)
 #+END_SRC
 
+** Keys
+#+BEGIN_SRC emacs-lisp
+  ;; Just kill buffer
+  (global-set-key [remap kill-buffer] 'kill-this-buffer)
+
+  ;; Ibuffer
+  (global-set-key [remap list-buffers] 'ibuffer)
+
+  ;; Font size
+  (global-set-key (kbd "C-=") 'text-scale-increase)
+  (global-set-key (kbd "C--") 'text-scale-decrease)
+  (global-set-key (kbd "C-+") (lambda () (interactive) (text-scale-set 0)))
+
+  ;; Config stuff
+  (global-set-key (kbd "<f9>") 'config-reinit)
+  (global-set-key (kbd "<f12>") 'edit-user-config)
+#+END_SRC
 ** Editor stuff
 #+BEGIN_SRC emacs-lisp
   (use-package frames-only-mode
@@ -165,17 +185,14 @@
 
 ** Innernet
 #+BEGIN_SRC emacs-lisp
-  (use-package w3m)
+  (use-package w3m
+    :disabled)
 
   (use-package web-search
-    :after w3m
     :init (setq web-search-default-provider "DuckDuckGo")
     :bind ("C-c w" . web-search))
 
 #+END_SRC
-
-#+RESULTS:
-: web-search
 
 ** Eshell
 #+BEGIN_SRC emacs-lisp
@@ -187,6 +204,7 @@
     (let ((inhibit-read-only t))
       (erase-buffer)))
 #+END_SRC
+
 ** Helping hands
 #+BEGIN_SRC emacs-lisp
   (defun from-userdir (path)
@@ -233,6 +251,25 @@
     :hook ((smartparens-enabled . evil-smartparens-mode)))
 #+END_SRC
 
+** IDE things
+#+BEGIN_SRC emacs-lisp
+  (use-package flycheck
+    :config (global-flycheck-mode 1))
+
+  (use-package expand-region
+    :bind ("C-." . 'er/expand-region))
+
+  (use-package projectile)
+
+  (use-package magit)
+
+  (use-package direnv
+    :config (direnv-mode))
+
+  (use-package nix-mode
+    :mode "\\.nix\\'")
+#+END_SRC
+
 ** Markup
 #+BEGIN_SRC emacs-lisp
   (use-package yaml-mode
@@ -251,7 +288,9 @@
     :if want-lispy
     :hook ((lisp-mode . lispy-mode)
            (emacs-lisp-mode . lispy-mode)
-           (clojure-mode . lispy-mode)))
+           (clojure-mode . lispy-mode))
+    :config
+    (add-to-list 'evil-emacs-state-modes 'lispy-mode))
 #+END_SRC
 
 ** Javascript
@@ -280,20 +319,3 @@
      #'pipenv-projectile-after-switch-extended)) 
 #+END_SRC
 
-* Keys
-#+BEGIN_SRC emacs-lisp
-  ;; Just kill buffer
-  (global-set-key [remap kill-buffer] 'kill-this-buffer)
-
-  ;; Ibuffer
-  (global-set-key [remap list-buffers] 'ibuffer)
-
-  ;; Font size
-  (global-set-key (kbd "C-=") 'text-scale-increase)
-  (global-set-key (kbd "C--") 'text-scale-decrease)
-  (global-set-key (kbd "C-+") (lambda () (interactive) (text-scale-set 0)))
-
-  ;; Config stuff
-  (global-set-key (kbd "<f9>") 'config-reinit)
-  (global-set-key (kbd "<f12>") 'edit-user-config)
-#+END_SRC
