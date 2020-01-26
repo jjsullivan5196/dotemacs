@@ -150,12 +150,15 @@
                        :repo "sunrise-commander/sunrise-commander"))
 #+END_SRC
 
-** PDF
+** Eshell
 #+BEGIN_SRC emacs-lisp
-  (use-package pdf-tools
-    :disabled
-    :mode (("\\.pdf\\'" . pdf-tools))
-    :config (pdf-loader-install))
+  (require 'eshell)
+
+  (defun eshell/clear ()
+    "Actually clear eshell"
+    (interactive)
+    (let ((inhibit-read-only t))
+      (erase-buffer)))
 #+END_SRC
 
 ** Evil
@@ -183,6 +186,14 @@
     :after evil)
 #+END_SRC
 
+** PDF
+#+BEGIN_SRC emacs-lisp
+  (use-package pdf-tools
+    :disabled
+    :mode (("\\.pdf\\'" . pdf-tools))
+    :config (pdf-loader-install))
+#+END_SRC
+
 ** Innernet
 #+BEGIN_SRC emacs-lisp
   (use-package w3m
@@ -192,17 +203,6 @@
     :init (setq web-search-default-provider "DuckDuckGo")
     :bind ("C-c w" . web-search))
 
-#+END_SRC
-
-** Eshell
-#+BEGIN_SRC emacs-lisp
-  (require 'eshell)
-
-  (defun eshell/clear ()
-    "Actually clear eshell"
-    (interactive)
-    (let ((inhibit-read-only t))
-      (erase-buffer)))
 #+END_SRC
 
 ** Helping hands
@@ -307,7 +307,7 @@
 	   (rjsx-mode . tide-hl-identifier-mode)))
 #+END_SRC
 
-* Snake
+** Snake
 #+BEGIN_SRC emacs-lisp
   (setq python-indent-offset 2)
 
