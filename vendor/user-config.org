@@ -9,6 +9,7 @@
     "lispy in lisp-modes")
 
   (defvar sexp-modes '(clojure-mode
+                       clojurescript-mode
                        emacs-lisp-mode
                        lisp-interaction-mode
                        lisp-mode)
@@ -128,7 +129,6 @@
 
   (use-package ivy
     :config
-    (setq ivy-initial-inputs-alist nil)
     (ivy-mode 1))
 
   (use-package counsel
@@ -141,6 +141,8 @@
     :config
     (global-set-key [remap isearch-forward] 'swiper-isearch)
     (global-set-key [remap isearch-backward] 'swiper-isearch-backward))
+
+  (setq ivy-initial-inputs-alist nil)
 
   (use-package company
     :config (global-company-mode 1))
