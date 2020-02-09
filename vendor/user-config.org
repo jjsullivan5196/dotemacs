@@ -68,6 +68,9 @@
   ;; line flow
   (setq-default fill-column 80)
 
+  ;; narrow?
+  (put 'narrow-to-region 'disabled nil)
+
   ;; self-care
   (setq inhibit-startup-screen t)
   (setq inhibit-startup-echo-area-message "This aint your dad's spacemacs")
