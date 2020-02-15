@@ -88,37 +88,6 @@
   (require 'straight-init)
 #+END_SRC
 
-** Custom hooks
-#+BEGIN_SRC emacs-lisp
-  (defvar non-sexp-mode-hook nil
-    "This hook will be invoked when a non-lisp language mode is used.")
-
-  (defvar sexp-mode-hook nil
-    "Hook for lisp-dialect language modes")
-
-  (add-hook 'prog-mode-hook (lambda ()
-                              (run-hooks (if (member major-mode sexp-modes)
-                                             'sexp-mode-hook 'non-sexp-mode-hook))))
-#+END_SRC
-
-** Keys
-#+BEGIN_SRC emacs-lisp
-  ;; Just kill buffer
-  (global-set-key [remap kill-buffer] 'kill-this-buffer)
-
-  ;; Ibuffer
-  (global-set-key [remap list-buffers] 'ibuffer)
-
-  ;; Font size
-  (global-set-key (kbd "C-=") 'text-scale-increase)
-  (global-set-key (kbd "C--") 'text-scale-decrease)
-  (global-set-key (kbd "C-+") (lambda () (interactive) (text-scale-set 0)))
-
-  ;; Config stuff
-  (global-set-key (kbd "<f9>") 'config-reinit)
-  (global-set-key (kbd "<f12>") 'edit-user-config)
-#+END_SRC
-
 ** Editor stuff
 #+BEGIN_SRC emacs-lisp
   (use-package frames-only-mode
@@ -149,6 +118,11 @@
 
   (use-package company
     :config (global-company-mode 1))
+
+  (use-package xah-fly-keys
+    :config
+    (xah-fly-keys-set-layout "qwerty")
+    (xah-fly-keys 1))
 
   (use-package sunrise
     :straight (sunrise :type git
@@ -245,6 +219,23 @@
             (mapcar (lambda (s) (list 'defvaralias s var)) syms)))
 #+END_SRC
 
+** Keys
+#+BEGIN_SRC emacs-lisp
+  (bind-keys
+    :map xah-fly-key-map
+    ;; Ibuffer
+    ([remap list-buffers] . ibuffer)
+
+    ;; Font size
+    ("C-=" . text-scale-increase)
+    ("C--" . text-scale-decrease)
+    ("C-+" . (lambda () (interactive) (text-scale-set 0)))
+
+    ;; Config
+    ("<f9>"  . config-reinit)
+    ("<f12>" . edit-user-config))
+#+END_SRC
+
 * Programming
 ** General
 #+BEGIN_SRC emacs-lisp
@@ -258,13 +249,9 @@
     :hook ((prog-mode . rainbow-delimiters-mode)))
 
   (use-package smartparens
-    :hook ((non-sexp-mode . smartparens-strict-mode))
+    :hook ((prog-mode . smartparens-mode)
+           (elisp-mode . smartparens-mode))
     :config (sp-use-smartparens-bindings))
-
-  (use-package evil-smartparens
-    :if want-evil
-    :after (evil smartparens)
-    :hook ((smartparens-enabled . evil-smartparens-mode)))
 #+END_SRC
 
 ** IDE things
@@ -293,12 +280,6 @@
     (setq-default clojure-indent-style 'align-arguments)
     (setq org-babel-clojure-backend 'cider)
     (require 'ob-clojure))
-
-  (use-package lispy
-    :if want-lispy
-    :hook ((sexp-mode . lispy-mode))
-    :config
-    (if want-evil (add-to-list 'evil-emacs-state-modes 'lispy-mode)))
 #+END_SRC
 
 ** Javascript
@@ -326,4 +307,5 @@
      pipenv-projectile-after-switch-function
      #'pipenv-projectile-after-switch-extended)) 
 #+END_SRC
+
 
