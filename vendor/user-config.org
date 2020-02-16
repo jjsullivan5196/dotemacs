@@ -290,6 +290,8 @@
 	         ("\\.tsx\\'" . rjsx-mode))
     :config (setq js2-strict-missing-semi-warning nil))
 
+  (use-package vue-mode)
+
   (use-package tide
     :after (rjsx-mode flycheck)
     :hook ((rjsx-mode . tide-setup)
