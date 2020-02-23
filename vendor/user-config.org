@@ -249,8 +249,8 @@
     :hook ((prog-mode . rainbow-delimiters-mode)))
 
   (use-package smartparens
-    :hook ((prog-mode . smartparens-mode)
-           (elisp-mode . smartparens-mode))
+    :hook ((prog-mode . smartparens-strict-mode)
+           (elisp-mode . smartparens-strict-mode))
     :config (sp-use-smartparens-bindings))
 #+END_SRC
 
