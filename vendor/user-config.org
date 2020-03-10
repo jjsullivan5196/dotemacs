@@ -52,18 +52,14 @@
   ;; truncate minibuffer display
   (setq message-truncate-lines t)
 
-  ;; modeline time
-  ;; (setq display-time-default-load-average nil)
-  ;; (setq display-time-format "%b %d %Y %H:%M")
-  ;; (display-time-mode 1)
-  ;; (display-battery-mode 1)
+  ;; annoying whitespace
+  (add-hook 'before-save-hook #'delete-trailing-whitespace)
 
-  ;; line numbers
-  (add-hook 
-    'prog-mode-hook 
-    (lambda ()
-      (display-line-numbers-mode)
-      (setq display-line-numbers 'relative)))
+  ;; prog-mode settings
+  (defun prog-mode-init ()
+    (display-line-numbers-mode)
+    (setq display-line-numbers 'relative))
+  (add-hook 'prog-mode-hook #'prog-mode-init)
 
   ;; line flow
   (setq-default fill-column 80)
@@ -279,7 +275,9 @@
     :init
     (setq-default clojure-indent-style 'align-arguments)
     (setq org-babel-clojure-backend 'cider)
-    (require 'ob-clojure))
+    (require 'ob-clojure)
+    :config
+    (setq cider-clojure-cli-parameters "-A:dev -m nrepl.cmdline --middleware '%s'"))
 #+END_SRC
 
 ** Javascript
