@@ -2,14 +2,12 @@
 
 * My settings
 #+BEGIN_SRC emacs-lisp
-  (defvar want-evil nil
+  (defvar want-evil t
     "evil-mode on startup.")
-
-  (defvar want-lispy t
-    "lispy in lisp-modes")
 
   (defvar sexp-modes '(clojure-mode
                        clojurescript-mode
+                       cider-repl-mode
                        emacs-lisp-mode
                        lisp-interaction-mode
                        lisp-mode)
@@ -84,10 +82,25 @@
   (require 'straight-init)
 #+END_SRC
 
+** Custom Hooks
+#+BEGIN_SRC emacs-lisp
+  (defvar non-sexp-mode-hook nil
+    "This hook will be invoked when a non-lisp language mode is used.")
+
+  (defvar sexp-mode-hook nil
+    "Hook for lisp-dialect language modes")
+
+  (defun choose-prog-style-hook ()
+    (run-hooks
+      (if (member major-mode sexp-modes)
+        'sexp-mode-hook 'non-sexp-mode-hook)))
+  (add-hook 'prog-mode-hook #'choose-prog-style-hook)
+#+END_SRC
+
 ** Editor stuff
 #+BEGIN_SRC emacs-lisp
   (use-package frames-only-mode
-    :config (frames-only-mode 1))  
+    :config (frames-only-mode 1))
 
   (use-package which-key
     :config (which-key-mode 1))
@@ -101,7 +114,7 @@
 
   (use-package counsel
     :after (ivy)
-    :config 
+    :config
     (counsel-mode 1))
 
   (use-package swiper
@@ -114,11 +127,6 @@
 
   (use-package company
     :config (global-company-mode 1))
-
-  (use-package xah-fly-keys
-    :config
-    (xah-fly-keys-set-layout "qwerty")
-    (xah-fly-keys 1))
 
   (use-package sunrise
     :straight (sunrise :type git
@@ -190,7 +198,6 @@
   (use-package web-search
     :init (setq web-search-default-provider "DuckDuckGo")
     :bind ("C-c w" . web-search))
-
 #+END_SRC
 
 ** Helping hands
@@ -213,23 +220,64 @@
     "Alias all of SYMS to VAR"
     (append '(progn)
             (mapcar (lambda (s) (list 'defvaralias s var)) syms)))
+
+  (defmacro defkeymap (name &rest keys)
+    "Create a new keymap bound to NAME with `bind-keys` style
+    bindings from KEYS"
+    `(progn
+       (setq ,name (make-sparse-keymap))
+       (bind-keys
+        :map ,name
+        ,@keys)
+       ',name))
 #+END_SRC
 
 ** Keys
 #+BEGIN_SRC emacs-lisp
+  ;; Global binds
   (bind-keys
-    :map xah-fly-key-map
-    ;; Ibuffer
-    ([remap list-buffers] . ibuffer)
+   ;; Ibuffer
+   ([remap list-buffers] . ibuffer)
 
-    ;; Font size
-    ("C-=" . text-scale-increase)
-    ("C--" . text-scale-decrease)
-    ("C-+" . (lambda () (interactive) (text-scale-set 0)))
+   ;; Font size
+   ("C-=" . text-scale-increase)
+   ("C--" . text-scale-decrease)
+   ("C-+" . (lambda () (interactive) (text-scale-set 0)))
 
-    ;; Config
-    ("<f9>"  . config-reinit)
-    ("<f12>" . edit-user-config))
+   ;; Config
+   ("<f9>"  . config-reinit)
+   ("<f12>" . edit-user-config))
+
+  ;; Leader
+  (setq leader-command-map (make-sparse-keymap))
+
+  ;; Help me
+  (bind-key "h" help-map leader-command-map)
+
+  ;; General commands
+  (bind-keys
+   :map leader-command-map
+   ;; Exec commands
+   ("<SPC>" . counsel-M-x)
+
+   ;; Interactive search
+   ("n" . swiper-isearch)
+   ("N" . swiper-isearch-backward))
+
+  ;; Buffers
+  (bind-keys
+   :map leader-command-map
+   :prefix-map leader-buffers-map
+   :prefix "b"
+   ("f" . find-file)
+   ("b" . switch-to-buffer)
+   ("k" . kill-this-buffer)
+   ("s" . save-buffer))
+
+  ;; Install leader commands
+  (bind-key "<menu>" leader-command-map)
+  (when want-evil
+    (bind-key "<SPC>" leader-command-map evil-motion-state-map))
 #+END_SRC
 
 * Programming
@@ -238,15 +286,14 @@
   (setq-default indent-tabs-mode nil
                 tab-width 2)
 
-  (make-alias 'tab-width 'standard-indent 
+  (make-alias 'tab-width 'standard-indent
                          'sh-basic-offset)
 
   (use-package rainbow-delimiters
     :hook ((prog-mode . rainbow-delimiters-mode)))
 
   (use-package smartparens
-    :hook ((prog-mode . smartparens-strict-mode)
-           (elisp-mode . smartparens-strict-mode))
+    :hook ((prog-mode . smartparens-mode))
     :config (sp-use-smartparens-bindings))
 #+END_SRC
 
@@ -256,7 +303,8 @@
     :config (global-flycheck-mode 1))
 
   (use-package expand-region
-    :bind ("C-." . 'er/expand-region))
+    :bind (:map leader-command-map
+                ("." . 'er/expand-region)))
 
   (use-package projectile)
 
@@ -271,13 +319,24 @@
 
 ** Lisp
 #+BEGIN_SRC emacs-lisp
+  (use-package parinfer-rust-mode
+    :if nil
+    :straight (parinfer-rust-mode
+               :type git :host github
+               :repo "justinbarclay/parinfer-rust-mode")
+    :hook sexp-mode
+    :init
+    (setq parinfer-rust-library (getenv "PARINFER_LIB"))
+    (setq parinfer-rust--test-p t))
+
   (use-package cider
     :init
     (setq-default clojure-indent-style 'align-arguments)
     (setq org-babel-clojure-backend 'cider)
     (require 'ob-clojure)
     :config
-    (setq cider-clojure-cli-parameters "-A:dev -m nrepl.cmdline --middleware '%s'"))
+    (setq cider-clojure-cli-parameters "-A:dev -m nrepl.cmdline --middleware '%s'")
+    (setq cider-shadow-cljs-command "clojure -A:shadow-cljs"))
 #+END_SRC
 
 ** Javascript
@@ -303,9 +362,10 @@
   (use-package pipenv
     :hook (python-mode . pipenv-mode)
     :init
-    (setq
-     pipenv-projectile-after-switch-function
-     #'pipenv-projectile-after-switch-extended)) 
+    (setq pipenv-projectile-after-switch-function
+          #'pipenv-projectile-after-switch-extended))
 #+END_SRC
-
-
+** Rust
+#+BEGIN_SRC emacs-lisp
+(use-package rust-mode)
+#+END_SRC
