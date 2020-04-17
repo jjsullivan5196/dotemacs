@@ -132,6 +132,8 @@
     :straight (sunrise :type git
                        :host github
                        :repo "sunrise-commander/sunrise-commander"))
+
+  (use-package vterm)
 #+END_SRC
 
 ** Markup
@@ -341,6 +343,8 @@
 
 ** Javascript
 #+BEGIN_SRC emacs-lisp
+  (setq js-indent-level 2)
+
   (use-package rjsx-mode
     :mode (("\\.js\\'"  . rjsx-mode)
 	         ("\\.ts\\'"  . rjsx-mode)
