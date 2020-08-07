@@ -50,9 +50,6 @@
   ;; truncate minibuffer display
   (setq message-truncate-lines t)
 
-  ;; annoying whitespace
-  (add-hook 'before-save-hook #'delete-trailing-whitespace)
-
   ;; prog-mode settings
   (defun prog-mode-init ()
     (display-line-numbers-mode)
@@ -133,7 +130,7 @@
                        :host github
                        :repo "sunrise-commander/sunrise-commander"))
 
-  (use-package vterm)
+  ;;(use-package vterm)
 #+END_SRC
 
 ** Markup
