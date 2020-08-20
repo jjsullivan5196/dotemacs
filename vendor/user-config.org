@@ -181,14 +181,6 @@
     :after evil)
 #+END_SRC
 
-** PDF
-#+BEGIN_SRC emacs-lisp
-  (use-package pdf-tools
-    :disabled
-    :mode (("\\.pdf\\'" . pdf-tools))
-    :config (pdf-loader-install))
-#+END_SRC
-
 ** Innernet
 #+BEGIN_SRC emacs-lisp
   (use-package w3m
@@ -318,16 +310,6 @@
 
 ** Lisp
 #+BEGIN_SRC emacs-lisp
-  (use-package parinfer-rust-mode
-    :if nil
-    :straight (parinfer-rust-mode
-               :type git :host github
-               :repo "justinbarclay/parinfer-rust-mode")
-    :hook sexp-mode
-    :init
-    (setq parinfer-rust-library (getenv "PARINFER_LIB"))
-    (setq parinfer-rust--test-p t))
-
   (use-package cider
     :init
     (setq-default clojure-indent-style 'align-arguments)
