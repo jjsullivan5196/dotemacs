@@ -96,6 +96,12 @@
 
 ** Editor stuff
 #+BEGIN_SRC emacs-lisp
+  (use-package yasnippet
+    :config
+    (setq yas-snippet-dirs
+          '("~/snip/"))
+    (yas-global-mode 1))
+
   (use-package frames-only-mode
     :config (frames-only-mode 1))
 
@@ -280,6 +286,28 @@
   (make-alias 'tab-width 'standard-indent
                          'sh-basic-offset)
 
+  ;;(use-package helm-gtags)
+
+  (defun gtags-root-dir ()
+    "Returns GTAGS root directory or nil if doesn't exist."
+    (with-temp-buffer
+      (if (zerop (call-process "global" nil t nil "-pr"))
+          (buffer-substring (point-min) (1- (point-max)))
+        nil)))
+
+  (defun gtags-update ()
+    "Make GTAGS incremental update"
+    (call-process "global" nil nil nil "-u"))
+
+  (defun gtags-update-hook ()
+    (when (gtags-root-dir)
+      (gtags-update)))
+
+  (defun add-gtags-hook ()
+    (add-hook 'after-save-hook #'gtags-update-hook 0 t))
+
+  ;;(add-hook 'c-mode-hook #'add-gtags-hook)
+
   (use-package rainbow-delimiters
     :hook ((prog-mode . rainbow-delimiters-mode)))
 
@@ -348,11 +376,13 @@
     (setq pipenv-projectile-after-switch-function
           #'pipenv-projectile-after-switch-extended))
 #+END_SRC
+
 ** Rust
 #+BEGIN_SRC emacs-lisp
 (use-package rust-mode)
 #+END_SRC
-** Nim
+
+** Zig
 #+BEGIN_SRC emacs-lisp
-(use-package nim-mode)
+(use-package zig-mode)
 #+END_SRC
