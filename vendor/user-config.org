@@ -314,10 +314,21 @@
   (use-package smartparens
     :hook ((prog-mode . smartparens-mode))
     :config (sp-use-smartparens-bindings))
+    
+  (use-package go-mode)
 #+END_SRC
 
 ** IDE things
 #+BEGIN_SRC emacs-lisp
+  (use-package project-el
+    :straight (project-el :type git
+                          :host github
+                          :repo "jorgenschaefer/project-el"
+                          :files ("project.el")))
+
+  (use-package eglot
+    :after (project-el))
+
   (use-package flycheck
     :config (global-flycheck-mode 1))
 
@@ -350,20 +361,29 @@
 
 ** Javascript
 #+BEGIN_SRC emacs-lisp
-  (setq js-indent-level 2)
+  (setq js-indent-level 2
+        js-switch-indent-offset 2)
 
   (use-package rjsx-mode
     :mode (("\\.js\\'"  . rjsx-mode)
-	         ("\\.ts\\'"  . rjsx-mode)
-	         ("\\.tsx\\'" . rjsx-mode))
+           ("\\.ts\\'"  . rjsx-mode)
+           ("\\.tsx\\'" . rjsx-mode))
     :config (setq js2-strict-missing-semi-warning nil))
+
+  (use-package coffee-mode)
+
+  (use-package svelte-mode)
+
+  (use-package qml-mode)
+
+  (use-package haxe-mode)
 
   (use-package vue-mode)
 
   (use-package tide
     :after (rjsx-mode flycheck)
     :hook ((rjsx-mode . tide-setup)
-	         (rjsx-mode . tide-hl-identifier-mode)))
+           (rjsx-mode . tide-hl-identifier-mode)))
 #+END_SRC
 
 ** Snake
@@ -384,5 +404,9 @@
 
 ** Zig
 #+BEGIN_SRC emacs-lisp
-(use-package zig-mode)
+  (use-package zig-mode
+    :after (eglot)
+    :config
+    (add-to-list 'eglot-server-programs '(zig-mode . ("zls")))
+    (add-hook 'zig-mode-hook 'eglot-ensure))
 #+END_SRC
