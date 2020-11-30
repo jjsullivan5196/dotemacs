@@ -384,6 +384,9 @@
     :after (rjsx-mode flycheck)
     :hook ((rjsx-mode . tide-setup)
            (rjsx-mode . tide-hl-identifier-mode)))
+  
+  (use-package php-mode)
+  (use-package web-mode)
 #+END_SRC
 
 ** Snake
