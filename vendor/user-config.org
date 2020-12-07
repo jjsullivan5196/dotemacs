@@ -21,7 +21,9 @@
   (setq ring-bell-function 'ignore)
 
   ;; backups
-  (setq backup-directory-alist '(("." . "~/.emacs.d/backup"))
+  (setq backup-directory-alist '((".*" . "~/.emacs.d/backup"))
+        auto-save-default nil
+        create-lockfiles nil
         backup-by-copying t    ; Don't delink hardlinks
         version-control t      ; Use version numbers on backups
         delete-old-versions t  ; Automatically delete excess backups
@@ -74,6 +76,7 @@
   ;; org-mode
   (require 'org)
   (setq-default org-confirm-babel-evaluate nil)
+  (setq org-image-actual-width '(400))
 
   ;; enable package manager
   (require 'straight-init)
