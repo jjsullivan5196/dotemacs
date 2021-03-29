@@ -173,7 +173,10 @@
     :init
     (setq evil-want-keybinding nil)
     (setq evil-want-integration t)
-    :config (evil-mode 1))
+    :config
+    (global-undo-tree-mode)
+    (evil-set-undo-system 'undo-tree)
+    (evil-mode 1))
 
   (use-package evil-surround
     :if want-evil
@@ -316,8 +319,13 @@
 
   (use-package smartparens
     :hook ((prog-mode . smartparens-mode))
-    :config (sp-use-smartparens-bindings))
-    
+    :bind
+    (:map clojure-mode-map
+          ("C-M-j" . sp-forward-slurp-sexp)
+          ("C-s-j" . sp-forward-barf-sexp)
+          ("C-M-k" . sp-backward-slurp-sexp)
+          ("C-s-k" . sp-backward-barf-sexp)))
+
   (use-package go-mode)
 #+END_SRC
 
