@@ -142,6 +142,11 @@
   ;;(use-package vterm)
 #+END_SRC
 
+** Mac
+#+BEGIN_SRC emacs-lisp
+  (when (string-equal system-type "darwin")
+    (add-to-list 'exec-path "/usr/local/bin"))
+#+END_SRC
 ** Markup
 #+BEGIN_SRC emacs-lisp
   (use-package yaml-mode
@@ -320,11 +325,11 @@
   (use-package smartparens
     :hook ((prog-mode . smartparens-mode))
     :bind
-    (:map clojure-mode-map
-          ("C-M-j" . sp-forward-slurp-sexp)
-          ("C-s-j" . sp-forward-barf-sexp)
-          ("C-M-k" . sp-backward-slurp-sexp)
-          ("C-s-k" . sp-backward-barf-sexp)))
+    (:map prog-mode-map
+          ("C-M-k" . sp-forward-slurp-sexp)
+          ("C-s-k" . sp-forward-barf-sexp)
+          ("C-M-j" . sp-backward-slurp-sexp)
+          ("C-s-j" . sp-backward-barf-sexp)))
 
   (use-package go-mode)
 #+END_SRC
@@ -365,7 +370,21 @@
     (setq-default clojure-indent-style 'align-arguments)
     (setq org-babel-clojure-backend 'cider)
     (require 'ob-clojure)
+    :bind
+    (:map cider-mode-map
+          ;; Eval and print top-level form in tooltip
+          ("C-c C-x" . cider-eval-defun-at-point)
+          ;; Eval and pretty-print top-level form to next line
+          ("C-c C-f" . cider-pprint-eval-defun-to-comment))
     :config
+    (setq cider-print-fn 'fipp)
+    (setq clojure-toplevel-inside-comment-form t)
+
+    ;; Format pretty-printed comments to appear as evaluation output
+    (setq cider-comment-prefix "\n  #_=> ")
+    (setq cider-comment-continued-prefix "       ")
+    (setq cider-comment-postfix "\n")
+
     (setq cider-clojure-cli-parameters "-A:dev -m nrepl.cmdline --middleware '%s'")
     (setq cider-shadow-cljs-command "clojure -A:shadow-cljs"))
 #+END_SRC
