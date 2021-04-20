@@ -278,6 +278,7 @@
    :prefix-map leader-buffers-map
    :prefix "b"
    ("f" . find-file)
+   ("g" . counsel-git)
    ("b" . switch-to-buffer)
    ("k" . kill-this-buffer)
    ("s" . save-buffer))
