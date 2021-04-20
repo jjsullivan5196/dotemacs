@@ -2,26 +2,58 @@
 
 * My settings
 #+BEGIN_SRC emacs-lisp
-  (defvar want-evil t
-    "evil-mode on startup.")
-
-  (defvar sexp-modes '(clojure-mode
-                       clojurescript-mode
-                       cider-repl-mode
-                       emacs-lisp-mode
-                       lisp-interaction-mode
-                       lisp-mode)
-    "Editing modes that use sexp/lisp syntax")
+;; nothing for now!
 #+END_SRC
 
 * Basics
+** Helping hands
+#+BEGIN_SRC emacs-lisp
+  (defun from-userdir (path)
+    "Expand relative PATH from `user-emacs-directory`"
+    (expand-file-name path user-emacs-directory))
+
+  (defun edit-user-config ()
+    "Edit the main configuration file"
+    (interactive)
+    (find-file-other-frame user-config-source-file))
+
+  (defun config-reinit ()
+    "Reload init.el"
+    (interactive)
+    (load (from-userdir "init.el")))
+
+  (defun kill-this-buffer-now ()
+    "The name"
+    (interactive)
+    (thread-first (window-buffer)
+      kill-buffer))
+
+  (defmacro make-alias (var &rest syms)
+    "Alias all of SYMS to VAR"
+    (append '(progn)
+            (mapcar (lambda (s) (list 'defvaralias s var)) syms)))
+
+  (defmacro defkeymap (name &rest keys)
+    "Create a new keymap bound to NAME with `bind-keys` style
+    bindings from KEYS"
+    `(progn
+       (setq ,name (make-sparse-keymap))
+       (bind-keys
+        :map ,name
+        ,@keys)
+       ',name))
+#+END_SRC
+
 ** Configure default behavior
 #+BEGIN_SRC emacs-lisp
   ;; ahhhhhhhhhhhhh
   (setq ring-bell-function 'ignore)
 
+  ;; y is y
+  (defalias 'yes-or-no-p 'y-or-n-p)
+
   ;; backups
-  (setq backup-directory-alist '((".*" . "~/.emacs.d/backup"))
+  (setq backup-directory-alist `((".*" . ,(from-userdir "backup")))
         auto-save-default nil
         create-lockfiles nil
         backup-by-copying t    ; Don't delink hardlinks
@@ -84,17 +116,6 @@
 
 ** Custom Hooks
 #+BEGIN_SRC emacs-lisp
-  (defvar non-sexp-mode-hook nil
-    "This hook will be invoked when a non-lisp language mode is used.")
-
-  (defvar sexp-mode-hook nil
-    "Hook for lisp-dialect language modes")
-
-  (defun choose-prog-style-hook ()
-    (run-hooks
-      (if (member major-mode sexp-modes)
-        'sexp-mode-hook 'non-sexp-mode-hook)))
-  (add-hook 'prog-mode-hook #'choose-prog-style-hook)
 #+END_SRC
 
 ** Editor stuff
@@ -102,7 +123,7 @@
   (use-package yasnippet
     :config
     (setq yas-snippet-dirs
-          '("~/snip/"))
+          '("~/.config/snip"))
     (yas-global-mode 1))
 
   (use-package frames-only-mode
@@ -170,34 +191,6 @@
       (erase-buffer)))
 #+END_SRC
 
-** Evil
-#+BEGIN_SRC emacs-lisp
-  (use-package evil
-    :if want-evil
-    :after undo-tree
-    :init
-    (setq evil-want-keybinding nil)
-    (setq evil-want-integration t)
-    :config
-    (global-undo-tree-mode)
-    (evil-set-undo-system 'undo-tree)
-    (evil-mode 1))
-
-  (use-package evil-surround
-    :if want-evil
-    :after evil
-    :config (global-evil-surround-mode 1))
-
-  (use-package evil-collection
-    :if want-evil
-    :after evil
-    :config (evil-collection-init))
-
-  (use-package evil-magit
-    :if want-evil
-    :after evil)
-#+END_SRC
-
 ** Innernet
 #+BEGIN_SRC emacs-lisp
   (use-package w3m
@@ -208,42 +201,25 @@
     :bind ("C-c w" . web-search))
 #+END_SRC
 
-** Helping hands
-#+BEGIN_SRC emacs-lisp
-  (defun from-userdir (path)
-    "Expand relative PATH from `user-emacs-directory`"
-    (expand-file-name path user-emacs-directory))
-
-  (defun edit-user-config ()
-    "Edit the main configuration file"
-    (interactive)
-    (find-file-other-frame user-config-source-file))
-
-  (defun config-reinit ()
-    "Reload init.el"
-    (interactive)
-    (load (from-userdir "init.el")))
-
-  (defmacro make-alias (var &rest syms)
-    "Alias all of SYMS to VAR"
-    (append '(progn)
-            (mapcar (lambda (s) (list 'defvaralias s var)) syms)))
-
-  (defmacro defkeymap (name &rest keys)
-    "Create a new keymap bound to NAME with `bind-keys` style
-    bindings from KEYS"
-    `(progn
-       (setq ,name (make-sparse-keymap))
-       (bind-keys
-        :map ,name
-        ,@keys)
-       ',name))
-#+END_SRC
-
 ** Keys
 #+BEGIN_SRC emacs-lisp
   ;; Global binds
   (bind-keys
+   ;; Navigation
+   ("C-l" . forward-char)
+   ("C-h" . backward-char)
+   ("C-j" . next-line)
+   ("C-k" . previous-line)
+   ("C-S-l" . move-end-of-line)
+   ("C-S-h" . move-beginning-of-line)
+   ("M-l" . forward-word)
+   ("M-h" . backward-word)
+   ("M-j" . forward-paragraph)
+   ("M-k" . backward-paragraph)
+
+   ;; Editing
+   ("C-S-j" . join-line)
+
    ;; Ibuffer
    ([remap list-buffers] . ibuffer)
 
@@ -258,6 +234,7 @@
 
   ;; Leader
   (setq leader-command-map (make-sparse-keymap))
+  (bind-key "M-SPC" leader-command-map)
 
   ;; Help me
   (bind-key "h" help-map leader-command-map)
@@ -280,45 +257,31 @@
    ("f" . find-file)
    ("g" . counsel-git)
    ("b" . switch-to-buffer)
-   ("k" . kill-this-buffer)
+   ("r" . revert-buffer)
+   ("k" . kill-this-buffer-now)
    ("s" . save-buffer))
 
-  ;; Install leader commands
-  (bind-key "<menu>" leader-command-map)
-  (when want-evil
-    (bind-key "<SPC>" leader-command-map evil-motion-state-map))
+  ;; Frames
+  (bind-keys
+   :map leader-command-map
+   :prefix-map leader-frames-map
+   :prefix "f"
+   ("f" . make-frame-command)
+   ("k" . delete-frame))
+
+  ;; Monkeypatching
+  (bind-keys
+   :map org-mode-map
+   ("C-j" . next-line))
 #+END_SRC
 
 * Programming
 ** General
 #+BEGIN_SRC emacs-lisp
   (setq-default indent-tabs-mode nil
-                tab-width 2)
-
-  (make-alias 'tab-width 'standard-indent
-                         'sh-basic-offset)
-
-  ;;(use-package helm-gtags)
-
-  (defun gtags-root-dir ()
-    "Returns GTAGS root directory or nil if doesn't exist."
-    (with-temp-buffer
-      (if (zerop (call-process "global" nil t nil "-pr"))
-          (buffer-substring (point-min) (1- (point-max)))
-        nil)))
-
-  (defun gtags-update ()
-    "Make GTAGS incremental update"
-    (call-process "global" nil nil nil "-u"))
-
-  (defun gtags-update-hook ()
-    (when (gtags-root-dir)
-      (gtags-update)))
-
-  (defun add-gtags-hook ()
-    (add-hook 'after-save-hook #'gtags-update-hook 0 t))
-
-  ;;(add-hook 'c-mode-hook #'add-gtags-hook)
+                tab-width 2
+                standard-indent 2
+                sh-basic-offset 2)
 
   (use-package rainbow-delimiters
     :hook ((prog-mode . rainbow-delimiters-mode)))
@@ -331,13 +294,12 @@
           ("C-s-k" . sp-forward-barf-sexp)
           ("C-M-j" . sp-backward-slurp-sexp)
           ("C-s-j" . sp-backward-barf-sexp)))
-
-  (use-package go-mode)
 #+END_SRC
 
 ** IDE things
 #+BEGIN_SRC emacs-lisp
   (use-package project-el
+    :disabled
     :straight (project-el :type git
                           :host github
                           :repo "jorgenschaefer/project-el"
@@ -362,6 +324,31 @@
 
   (use-package nix-mode
     :mode "\\.nix\\'")
+#+END_SRC
+
+** C/C++
+#+BEGIN_SRC emacs-lisp
+  ;;(use-package helm-gtags)
+
+  (defun gtags-root-dir ()
+    "Returns GTAGS root directory or nil if doesn't exist."
+    (with-temp-buffer
+      (if (zerop (call-process "global" nil t nil "-pr"))
+          (buffer-substring (point-min) (1- (point-max)))
+        nil)))
+
+  (defun gtags-update ()
+    "Make GTAGS incremental update"
+    (call-process "global" nil nil nil "-u"))
+
+  (defun gtags-update-hook ()
+    (when (gtags-root-dir)
+      (gtags-update)))
+
+  (defun add-gtags-hook ()
+    (add-hook 'after-save-hook #'gtags-update-hook 0 t))
+
+  ;;(add-hook 'c-mode-hook #'add-gtags-hook)
 #+END_SRC
 
 ** Lisp
@@ -429,6 +416,11 @@
     :init
     (setq pipenv-projectile-after-switch-function
           #'pipenv-projectile-after-switch-extended))
+#+END_SRC
+
+** Gophers
+#+BEGIN_SRC emacs-lisp
+  (use-package go-mode)
 #+END_SRC
 
 ** Rust

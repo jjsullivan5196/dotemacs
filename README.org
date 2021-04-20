@@ -1,5 +1,4 @@
 ** My (pretty small) emacs config
-
 This is my first try at making a fairly-detailed emacs config by hand. I've had
 previous experience with spacemacs, but (for me) it was kinda sluggish and I
 didn't really understand all the things they were doing under the hood.
@@ -16,8 +15,6 @@ as the [[https://github.com/raxod502/straight.el][straight package manager]]), a
  - Packages installed and configured with [[https://github.com/raxod502/straight.el][straight]] and [[https://github.com/jwiegley/use-package][use-package]]
  - Decent amount of configured packages for everyday things (programming
    helpers, completion with ivy/company, magit)
- - Modal editing and quick motion/selection with [[https://github.com/emacs-evil][evil-mode]] and companion
-   packages
  - Never forget another key chord with [[https://github.com/justbur/emacs-which-key][which-key]]
  - Some helper functions for getting around quick, one key to open conifg file
    in new frame
