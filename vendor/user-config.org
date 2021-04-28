@@ -356,6 +356,9 @@
 
 ** Lisp
 #+BEGIN_SRC emacs-lisp
+  (use-package flycheck-clj-kondo
+    :after (flycheck cider)) 
+
   (use-package cider
     :init
     (setq-default clojure-indent-style 'align-arguments)
@@ -377,7 +380,8 @@
     (setq cider-comment-postfix "\n")
 
     (setq cider-clojure-cli-parameters "-A:dev -m nrepl.cmdline --middleware '%s'")
-    (setq cider-shadow-cljs-command "clojure -A:shadow-cljs"))
+    (setq cider-shadow-cljs-command "clojure -A:shadow-cljs")
+    (require 'flycheck-clj-kondo))
 #+END_SRC
 
 ** Javascript
