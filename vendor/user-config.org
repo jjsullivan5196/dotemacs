@@ -290,6 +290,8 @@
     :hook ((prog-mode . smartparens-mode))
     :bind
     (:map prog-mode-map
+          ("M-l" . sp-forward-sexp)
+          ("M-h" . sp-backward-sexp)
           ("C-M-k" . sp-forward-slurp-sexp)
           ("C-s-k" . sp-forward-barf-sexp)
           ("C-M-j" . sp-backward-slurp-sexp)
@@ -317,7 +319,8 @@
 
   (use-package projectile)
 
-  (use-package magit)
+  (use-package magit
+    :config (setq project-switch-commands nil))
 
   (use-package direnv
     :config (direnv-mode))
