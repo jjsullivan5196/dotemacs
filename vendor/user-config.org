@@ -232,6 +232,37 @@
    ("<f9>"  . config-reinit)
    ("<f12>" . edit-user-config))
 
+  ;; Command mode
+  (setq command-mode-map (make-sparse-keymap))
+
+  (bind-keys
+   :map command-mode-map
+   ;; Navigation
+   ("l" . forward-char)
+   ("h" . backward-char)
+   ("j" . next-line)
+   ("k" . previous-line)
+   ("M-l" . forward-word)
+   ("M-h" . backward-word)
+   ("M-j" . forward-paragraph)
+   ("M-k" . backward-paragraph)
+   ("S-l" . move-end-of-line)
+   ("S-h" . move-beginning-of-line)
+
+   ;; Editing
+   ("d" . kill-region)
+   ("y" . kill-ring-save)
+   ("p" . yank)
+   ("S-j" . join-line)
+
+   ;; Selection
+   ("v" . set-mark-command)
+   ("S-v" . rectangle-mark-mode))
+
+  (define-minor-mode command-mode
+    "Move in directions!"
+    :keymap command-mode-map)
+
   ;; Leader
   (setq leader-command-map (make-sparse-keymap))
   (bind-key "M-SPC" leader-command-map)
