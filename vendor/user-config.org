@@ -17,31 +17,41 @@
     (interactive)
     (find-file-other-frame user-config-source-file))
 
+  (defun save-user-config ()
+    "Save any changes to user-config.org"
+    (interactive)
+    (let ((config (current-window-configuration)))
+      (find-file user-config-source-file)
+      (save-buffer)
+      (set-window-configuration config)))
+
   (defun config-reinit ()
     "Reload init.el"
     (interactive)
+    (save-user-config)
     (load (from-userdir "init.el")))
 
   (defun kill-this-buffer-now ()
     "The name"
     (interactive)
-    (thread-first (window-buffer)
-      kill-buffer))
+    (-> (window-buffer)
+        kill-buffer))
 
-  (defmacro make-alias (var &rest syms)
-    "Alias all of SYMS to VAR"
-    (append '(progn)
-            (mapcar (lambda (s) (list 'defvaralias s var)) syms)))
+  (defun kbd-cons (k)
+    "Turn keystring-cmd pair K into keymap alist entry."
+    (let ((chord (-> k car kbd))
+          (cmd (cdr k)))
+      (cons chord cmd)))
 
-  (defmacro defkeymap (name &rest keys)
-    "Create a new keymap bound to NAME with `bind-keys` style
-    bindings from KEYS"
-    `(progn
-       (setq ,name (make-sparse-keymap))
-       (bind-keys
-        :map ,name
-        ,@keys)
-       ',name))
+  (defmacro keymap-alist (&rest alist)
+    "Take ALIST of keystring-cmd pairs and turn it into a keymap list."
+    (->> alist
+         (mapcar #'kbd-cons)
+         (list 'quote)))
+
+  (defmacro comment (&rest _)
+    "Ignore anything inside here."
+    nil)
 #+END_SRC
 
 ** Configure default behavior
@@ -84,11 +94,11 @@
   ;; truncate minibuffer display
   (setq message-truncate-lines t)
 
+  ;; trailing whitespace
+  (add-hook 'before-save-hook 'delete-trailing-whitespace)
+
   ;; prog-mode settings
-  (defun prog-mode-init ()
-    (display-line-numbers-mode)
-    (setq display-line-numbers 'relative))
-  (add-hook 'prog-mode-hook #'prog-mode-init)
+  (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 
   ;; line flow
   (setq-default fill-column 80)
@@ -201,25 +211,51 @@
     :bind ("C-c w" . web-search))
 #+END_SRC
 
-** Keys
+** Command Mode
 #+BEGIN_SRC emacs-lisp
-  ;; Global binds
+  (setq command-mode-map (make-sparse-keymap))
+
+  (define-minor-mode command-mode
+    "A lesser evil"
+    :keymap command-mode-map
+    :global t)
+
   (bind-keys
+   :map command-mode-map
    ;; Navigation
-   ("C-l" . forward-char)
-   ("C-h" . backward-char)
-   ("C-j" . next-line)
-   ("C-k" . previous-line)
-   ("C-S-l" . move-end-of-line)
-   ("C-S-h" . move-beginning-of-line)
+   ("l"   . forward-char)
+   ("h"   . backward-char)
+   ("j"   . next-line)
+   ("k"   . previous-line)
    ("M-l" . forward-word)
    ("M-h" . backward-word)
    ("M-j" . forward-paragraph)
    ("M-k" . backward-paragraph)
+   ("L" . move-end-of-line)
+   ("H" . move-beginning-of-line)
 
    ;; Editing
-   ("C-S-j" . join-line)
+   ("u"   . undo-tree-undo)
+   ("U"   . undo-tree-redo)
+   ("d"   . kill-region)
+   ("y"   . kill-ring-save)
+   ("p"   . yank)
+   ("o"   . open-line)
+   ("J"   . join-line)
 
+   ;; Selection
+   ("v"   . set-mark-command)
+   ("V"   . rectangle-mark-mode)
+
+   ;; Exit
+   ("z" . command-mode))
+
+  (global-set-key (kbd "C-z") 'command-mode)
+#+END_SRC
+** Keys
+#+BEGIN_SRC emacs-lisp
+  ;; Global binds
+  (bind-keys
    ;; Ibuffer
    ([remap list-buffers] . ibuffer)
 
@@ -231,37 +267,6 @@
    ;; Config
    ("<f9>"  . config-reinit)
    ("<f12>" . edit-user-config))
-
-  ;; Command mode
-  (setq command-mode-map (make-sparse-keymap))
-
-  (bind-keys
-   :map command-mode-map
-   ;; Navigation
-   ("l" . forward-char)
-   ("h" . backward-char)
-   ("j" . next-line)
-   ("k" . previous-line)
-   ("M-l" . forward-word)
-   ("M-h" . backward-word)
-   ("M-j" . forward-paragraph)
-   ("M-k" . backward-paragraph)
-   ("S-l" . move-end-of-line)
-   ("S-h" . move-beginning-of-line)
-
-   ;; Editing
-   ("d" . kill-region)
-   ("y" . kill-ring-save)
-   ("p" . yank)
-   ("S-j" . join-line)
-
-   ;; Selection
-   ("v" . set-mark-command)
-   ("S-v" . rectangle-mark-mode))
-
-  (define-minor-mode command-mode
-    "Move in directions!"
-    :keymap command-mode-map)
 
   ;; Leader
   (setq leader-command-map (make-sparse-keymap))
@@ -299,11 +304,6 @@
    :prefix "f"
    ("f" . make-frame-command)
    ("k" . delete-frame))
-
-  ;; Monkeypatching
-  (bind-keys
-   :map org-mode-map
-   ("C-j" . next-line))
 #+END_SRC
 
 * Programming
@@ -320,9 +320,10 @@
   (use-package smartparens
     :hook ((prog-mode . smartparens-mode))
     :bind
-    (:map prog-mode-map
+    (:map command-mode-map
           ("M-l" . sp-forward-sexp)
           ("M-h" . sp-backward-sexp)
+     :map prog-mode-map
           ("C-M-k" . sp-forward-slurp-sexp)
           ("C-s-k" . sp-forward-barf-sexp)
           ("C-M-j" . sp-backward-slurp-sexp)
