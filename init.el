@@ -2,7 +2,8 @@
 
 ;;; Prelude
 ;; load modules from config dir
-(add-to-list 'load-path user-emacs-directory)
+(add-to-list 'load-path (expand-file-name "vendor/"
+                                          user-emacs-directory))
 
 ;; enable package manager
 (require 'straight-init)
@@ -199,63 +200,9 @@
   :init (setq web-search-default-provider "DuckDuckGo")
   :bind ("C-c w" . web-search))
 
-;;; Command Mode
-(setq command-mode-map (make-sparse-keymap))
-
-(define-minor-mode command-mode
-  "A lesser evil."
-  :keymap command-mode-map)
-
-(bind-keys
- :map command-mode-map
- ;; Navigation
- ("l"   . forward-char)
- ("h"   . backward-char)
- ("j"   . next-line)
- ("k"   . previous-line)
- ("M-l" . forward-word)
- ("M-h" . backward-word)
- ("M-j" . forward-paragraph)
- ("M-k" . backward-paragraph)
- ("L"   . move-end-of-line)
- ("H"   . move-beginning-of-line)
-
- ;; Editing
- ("u"   . undo-tree-undo)
- ("U"   . undo-tree-redo)
- ("y"   . kill-ring-save)
- ("p"   . yank)
- ("x"   . delete-char)
- ("X"   . delete-backward-char)
- ("o"   . open-line)
- ("J"   . join-line)
- ("c"   . string-rectangle)
-
- ;; Selection
- ("v"   . set-mark-command)
- ("V"   . rectangle-mark-mode)
-
- ;; Exit
- ("<C-backspace>" . command-mode))
-
-(bind-keys
- :map command-mode-map
- :prefix-map delete-motion-map
- :prefix "d"
- ("r"   . kill-region)
- ("d"   . kill-whole-line)
- ("M-l" . kill-word)
- ("M-h" . backward-kill-word)
- ("M-j" . kill-paragraph)
- ("M-k" . backward-kill-paragraph))
-
-(global-set-key (kbd "<C-backspace>") 'command-mode)
-
 ;;; Keys
-(setq leader-command-map   (make-sparse-keymap)
-      global-keys-mode-map (make-sparse-keymap))
+(setq global-keys-mode-map (make-sparse-keymap))
 
-;;;; Global binds
 (define-minor-mode global-keys-mode
   "Mode for global keybinds without messing with global keymap."
   :global t
@@ -263,6 +210,7 @@
 
 (global-keys-mode 1)
 
+;;;; Global binds
 (bind-keys
  :map global-keys-mode-map
  ;; Ibuffer
@@ -278,11 +226,11 @@
  ("<f12>" . edit-user-config))
 
 ;;;; Leader
-(bind-key "M-SPC" leader-command-map global-keys-mode-map)
-
 ;; General commands
 (bind-keys
- :map leader-command-map
+ :map global-keys-mode-map
+ :prefix-map leader-command-map
+ :prefix "M-SPC"
  ;; Exec commands
  ("<SPC>" . counsel-M-x)
 
@@ -313,6 +261,58 @@
  ("f" . make-frame-command)
  ("k" . delete-frame))
 
+;;; Command Mode
+(setq command-mode-map (make-sparse-keymap))
+
+(define-minor-mode command-mode
+  "A lesser evil."
+  :keymap command-mode-map)
+
+(bind-key (kbd "<C-backspace>") #'command-mode global-keys-mode-map)
+
+(add-hook 'prog-mode-hook #'command-mode)
+(add-hook 'dired-mode-hook #'command-mode)
+
+(bind-keys
+ :map command-mode-map
+ ;; Navigation
+ ("l"   . forward-char)
+ ("h"   . backward-char)
+ ("j"   . next-line)
+ ("k"   . previous-line)
+ ("M-l" . forward-word)
+ ("M-h" . backward-word)
+ ("M-j" . forward-paragraph)
+ ("M-k" . backward-paragraph)
+ ("L"   . move-end-of-line)
+ ("H"   . move-beginning-of-line)
+
+ ;; Editing
+ ("u"   . undo-tree-undo)
+ ("U"   . undo-tree-redo)
+ ("y"   . kill-ring-save)
+ ("p"   . yank)
+ ("x"   . delete-char)
+ ("X"   . delete-backward-char)
+ ("o"   . open-line)
+ ("J"   . join-line)
+ ("c"   . string-rectangle)
+
+ ;; Selection
+ ("v"   . set-mark-command)
+ ("V"   . rectangle-mark-mode))
+
+(bind-keys
+ :map command-mode-map
+ :prefix-map delete-motion-map
+ :prefix "d"
+ ("r"   . kill-region)
+ ("d"   . kill-whole-line)
+ ("M-l" . kill-word)
+ ("M-h" . backward-kill-word)
+ ("M-j" . kill-paragraph)
+ ("M-k" . backward-kill-paragraph))
+
 ;;; Programming
 ;;;; General
 (setq-default indent-tabs-mode nil
@@ -326,10 +326,7 @@
 (use-package smartparens
   :hook ((prog-mode . smartparens-mode))
   :bind
-  (:map command-mode-map
-        ("M-l" . sp-forward-sexp)
-        ("M-h" . sp-backward-sexp)
-        :map prog-mode-map
+  (:map prog-mode-map
         ("C-M-k" . sp-forward-slurp-sexp)
         ("C-s-k" . sp-forward-barf-sexp)
         ("C-M-j" . sp-backward-slurp-sexp)
@@ -390,6 +387,10 @@
 ;;(add-hook 'c-mode-hook #'add-gtags-hook)
 
 ;;;; Lisp
+(defun cider-prestart ()
+  "Set local bindings for cider."
+  (add-hook 'before-save-hook #'cider-format-buffer t t))
+
 (use-package flycheck-clj-kondo
   :after (flycheck cider))
 
@@ -398,12 +399,9 @@
   (setq-default clojure-indent-style 'align-arguments)
   (setq org-babel-clojure-backend 'cider)
   (require 'ob-clojure)
-  :bind
-  (:map cider-mode-map
-        ;; Eval and print top-level form in tooltip
-        ("C-c C-x" . cider-eval-defun-at-point)
-        ;; Eval and pretty-print top-level form to next line
-        ("C-c C-f" . cider-pprint-eval-defun-to-comment))
+  :hook (clojure-mode . cider-prestart)
+  :bind (:map cider-mode-map
+              ("C-, e" . 'cider-eval-commands-map))
   :config
   (setq cider-print-fn 'fipp)
   (setq clojure-toplevel-inside-comment-form t)
