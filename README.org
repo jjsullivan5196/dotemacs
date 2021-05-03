@@ -6,7 +6,8 @@ didn't really understand all the things they were doing under the hood.
 I started with this config so I could have a good grip on everything I was
 adding to the editor. I also show a preference in here for idiomatic and
 declarative configuration, use of helper modules provided by the community (such
-as the [[https://github.com/raxod502/straight.el][straight package manager]]), and neatly-kept passages using ~org-tangle~.
+as the [[https://github.com/raxod502/straight.el][straight package manager]]), and neatly-kept passages using
+~outshine-mode~.
 
 ** Some 'features'
 
@@ -19,14 +20,7 @@ as the [[https://github.com/raxod502/straight.el][straight package manager]]), a
  - Some helper functions for getting around quick, one key to open conifg file
    in new frame
 
-There's still a lot of work to be done here, but the foundation is pretty much
-set.  If you're looking for a good starting point for a configuration you want
-to maintain by yourself, feel free to browse thru
-~vendor/user-config.org~. ~init.el~ contains an incredibly simple bootstrap for
-a literate config file, so it's probably the best thing you can steal from here
-:-)
-
 ** License
 
 The entirety of this repo is available under the MIT license in ~LICENSE.txt~,
-so feel free to use any of it for your desired purposes.
+feel free to use it as you see fit.
