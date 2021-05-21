@@ -69,10 +69,6 @@
 ;; ahhhhhhhhhhhhh
 (setq ring-bell-function 'ignore)
 
-;; Mac
-(when (string-equal system-type "darwin")
-  (add-to-list 'exec-path "/usr/local/bin"))
-
 ;; y is y
 (defalias 'yes-or-no-p 'y-or-n-p)
 
@@ -132,6 +128,11 @@
 
 ;;; Editor stuff
 (use-package outshine)
+
+(use-package exec-path-from-shell
+  :config
+  (when (string-equal system-type "darwin")
+    (exec-path-from-shell-initialize)))
 
 (use-package yasnippet
   :config
