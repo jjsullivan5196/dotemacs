@@ -2,8 +2,8 @@
 
 ;;; Prelude
 ;; load modules from config dir
-(add-to-list 'load-path (expand-file-name "vendor/"
-                                          user-emacs-directory))
+(add-to-list 'load-path
+             (expand-file-name "vendor/" user-emacs-directory))
 
 ;; enable package manager
 (require 'straight-init)
@@ -16,13 +16,24 @@
   "Expand relative PATH from `user-emacs-directory`."
   (expand-file-name path user-emacs-directory))
 
+(defun mime-open-file (path)
+  "Open file at PATH with an appropriate application."
+  (make-process :name "open-file"
+                :command (list "xdg-open" path)))
+
+(defun dired-open-at-point ()
+  "Opens the file under the point with `mime-open-file`."
+  (interactive)
+  (-> (dired-filename-at-point)
+      mime-open-file))
+
 (defun edit-user-config ()
   "Edit the main configuration file."
   (interactive)
-  (find-file-other-frame user-config-file))
+  (find-file user-config-file))
 
 (defun save-file (fname)
-  "Save any changes to file at path FNAME."
+  "Save any change to file at path FNAME."
   (interactive)
   (let ((config (current-window-configuration)))
     (find-file fname)
@@ -30,33 +41,42 @@
     (set-window-configuration config)))
 
 (defun config-reinit ()
-  "Reload init.el"
+  "Reload init."
   (interactive)
   (-doto user-config-file
     (save-file)
     (load)))
 
 (defun kill-this-buffer-now ()
-  "The name"
+  "Kill the active buffer."
   (interactive)
   (-> (window-buffer)
       kill-buffer))
 
-(defun kbd-cons (k)
-  "Turn keystring-cmd pair K into keymap alist entry."
-  (let ((chord (-> k car kbd))
-        (cmd (cdr k)))
-    (cons chord cmd)))
+(defun juxt* (fns &rest args)
+  "Apply list of functions FNS to ARGS, return a list of corresponding results."
+  (mapcar (lambda (f) (apply f args)) fns))
 
-(defmacro keymap-alist (&rest alist)
-  "Take ALIST of keystring-cmd pairs and turn it into a keymap list."
-  (->> alist
-       (mapcar #'kbd-cons)
-       (list 'quote)))
+(defun spit (obj fname)
+  "Serialize OBJ and write it to file FNAME."
+  (with-temp-buffer
+    (print obj (current-buffer))
+    (write-file fname)))
+
+(defun read-first (fname)
+  "Read first object from file FNAME."
+  (with-temp-buffer
+    (insert-file-contents fname)
+    (read (current-buffer))))
 
 (defmacro comment (&rest _)
   "Ignore anything inside here."
   nil)
+
+(defun unbind-all (sym)
+  "Remove all bindings from SYM."
+  (fmakunbound sym)
+  (makunbound sym))
 
 (defalias 'do 'progn)
 
@@ -116,6 +136,9 @@
 ;; narrow?
 (put 'narrow-to-region 'disabled nil)
 
+;; messin with windows
+(winner-mode 1)
+
 ;; self-care
 (setq inhibit-startup-screen t)
 (setq inhibit-startup-echo-area-message "This aint your dad's spacemacs")
@@ -140,7 +163,16 @@
         '("~/.config/snip"))
   (yas-global-mode 1))
 
+(use-package ace-window
+  :config
+  (custom-set-faces
+   '(aw-leading-char-face
+     ((t (:inherit    ace-jump-face-foreground
+          :height     4.5
+          :foreground "red"))))))
+
 (use-package frames-only-mode
+  :disabled t
   :config (frames-only-mode 1))
 
 (use-package which-key
@@ -148,6 +180,8 @@
 
 (use-package undo-tree
   :config (global-undo-tree-mode 1))
+
+(use-package hydra)
 
 (use-package ivy
   :config
@@ -173,6 +207,63 @@
   :straight (sunrise :type git
                      :host github
                      :repo "sunrise-commander/sunrise-commander"))
+;;; Perspectives
+(defvar perspectives-table
+  (make-hash-table :test 'equal)
+  "Holds onto saved window states to be used again later.")
+
+(comment
+ (unbind-all 'perspectives-table))
+
+;;;; Serialization
+(defvar perspectives-file
+  (from-userdir "perspectives.dat")
+  "Location to serialize perspectives.")
+
+(defun save-perspectives (&optional fname)
+  "Save open perspectives to file FNAME."
+  (interactive)
+  (let ((fname (or fname perspectives-file)))
+    (spit perspectives-table fname)))
+
+(defun load-perspectives (&optional fname)
+  "Load perspectives from file FNAME."
+  (interactive)
+  (let ((fname (or fname perspectives-file)))
+    (when (file-exists-p fname)
+      (setq perspectives-table
+            (or (read-first fname)
+                perspectives-table)))))
+
+(add-hook 'kill-emacs-hook 'save-perspectives)
+(add-hook 'emacs-startup-hook 'load-perspectives)
+
+;;;; Interaction
+(defun choose-perspective (prompt)
+  "Choose an open perspective with PROMPT."
+  (ivy-read prompt perspectives-table))
+
+(defun add-perspective (name window-state)
+  "Add perspective NAME with WINDOW-STATE to perspectives."
+  (interactive (list (choose-perspective "Add perspective: ")
+                     (window-state-get (frame-root-window) t)))
+  (puthash name window-state perspectives-table))
+
+(defun switch-perspective (name)
+  "Jump to NAME perspective."
+  (interactive (list (choose-perspective "Switch to: ")))
+  (let ((window-state (gethash name perspectives-table)))
+    (when window-state
+      (window-state-put window-state))))
+
+(defun remove-perspective (name)
+  "Remove NAME perspective."
+  (interactive (list (choose-perspective "Remove: ")))
+  (remhash name perspectives-table))
+
+;;; Desktop
+(setq desktop-restore-frames nil)
+(desktop-save-mode 1)
 
 ;;; Markup
 (use-package yaml-mode
@@ -188,7 +279,7 @@
 (require 'eshell)
 
 (defun eshell/clear ()
-  "Actually clear eshell"
+  "Actually clear eshell."
   (interactive)
   (let ((inhibit-read-only t))
     (erase-buffer)))
@@ -210,6 +301,10 @@
   :keymap global-keys-mode-map)
 
 (global-keys-mode 1)
+
+(bind-keys
+ :map dired-mode-map
+ ("C-c C-o" . dired-open-at-point))
 
 ;;;; Global binds
 (bind-keys
@@ -252,7 +347,8 @@
  ("b" . switch-to-buffer)
  ("r" . revert-buffer)
  ("k" . kill-this-buffer-now)
- ("s" . save-buffer))
+ ("s" . save-buffer)
+ ("w" . write-file))
 
 ;; Frames
 (bind-keys
@@ -260,59 +356,85 @@
  :prefix-map leader-frames-map
  :prefix "f"
  ("f" . make-frame-command)
- ("k" . delete-frame))
+ ("k" . delete-frame)
+ ("c" . remove-perspective))
 
-;;; Command Mode
-(setq command-mode-map (make-sparse-keymap))
+(defhydra hydra-frame-windows (leader-command-map "w")
+  ("q" nil "quit")
+  ("j" shrink-window "shrink length")
+  ("k" enlarge-window "expand length")
+  ("h" shrink-window-horizontally "shrink width")
+  ("l" enlarge-window-horizontally "expand width")
+  ("a" ace-window "change window")
+  ("A" (lambda () (interactive) (ace-window 4)) "swap windows")
+  ("d" delete-window "delete window")
+  ("r" delete-other-windows "remove others")
+  ("b" split-window-right "split vertically")
+  ("B" split-window-below "split horizontally")
+  ("u" winner-undo "undo change")
+  ("U" winner-redo "redo change")
+  ("v" switch-perspective "change perspective")
+  ("V" add-perspective "save perspective"))
 
-(define-minor-mode command-mode
-  "A lesser evil."
-  :keymap command-mode-map)
+;;; Editing Shortcuts
+(defhydra hydra-edit (global-keys-mode-map "<C-backspace>")
+  ("q" nil "quit")
 
-(bind-key (kbd "<C-backspace>") #'command-mode global-keys-mode-map)
+  ;; Navigation
+  ("n" swiper-isearch)
+  ("N" swiper-isearch-backward)
+  ("j" next-line)
+  ("k" previous-line)
+  ("h" backward-char)
+  ("l" forward-char)
+  ("e" forward-word)
+  ("w" backward-word)
+  ("]" forward-paragraph)
+  ("[" backward-paragraph)
+  ("H" move-beginning-of-line)
+  ("L" move-end-of-line)
 
-(add-hook 'prog-mode-hook #'command-mode)
-(add-hook 'dired-mode-hook #'command-mode)
+  ;; Editing
+  ("u" undo-tree-undo)
+  ("U" undo-tree-redo)
+  ("y" kill-ring-save)
+  ("p" yank)
+  ("d" delete-region)
+  ("o" open-line)
+  ("J" join-line)
+  ("c" string-rectangle)
 
-(bind-keys
- :map command-mode-map
- ;; Navigation
- ("l"   . forward-char)
- ("h"   . backward-char)
- ("j"   . next-line)
- ("k"   . previous-line)
- ("M-l" . forward-word)
- ("M-h" . backward-word)
- ("M-j" . forward-paragraph)
- ("M-k" . backward-paragraph)
- ("L"   . move-end-of-line)
- ("H"   . move-beginning-of-line)
+  ;; Selection
+  ("v" set-mark-command)
+  ("V" rectangle-mark-mode))
 
- ;; Editing
- ("u"   . undo-tree-undo)
- ("U"   . undo-tree-redo)
- ("y"   . kill-ring-save)
- ("p"   . yank)
- ("x"   . delete-char)
- ("X"   . delete-backward-char)
- ("o"   . open-line)
- ("J"   . join-line)
- ("c"   . string-rectangle)
+(defhydra hydra-sp-edit (global-keys-mode-map "<C-S-backspace>")
+  ("q" nil "quit")
 
- ;; Selection
- ("v"   . set-mark-command)
- ("V"   . rectangle-mark-mode))
+  ;; Navigation
+  ("n" swiper-isearch)
+  ("N" swiper-isearch-backward)
+  ("j" sp-forward-sexp)
+  ("k" sp-backward-sexp)
+  ("h" sp-up-sexp)
+  ("l" sp-down-sexp)
+  ("]" forward-paragraph)
+  ("[" backward-paragraph)
 
-(bind-keys
- :map command-mode-map
- :prefix-map delete-motion-map
- :prefix "d"
- ("r"   . kill-region)
- ("d"   . kill-whole-line)
- ("M-l" . kill-word)
- ("M-h" . backward-kill-word)
- ("M-j" . kill-paragraph)
- ("M-k" . backward-kill-paragraph))
+  ;; Editing
+  ("." sp-forward-slurp-sexp)
+  ("," sp-forward-barf-sexp)
+  ("w" sp-transpose-sexp)
+  ("u" undo-tree-undo)
+  ("U" undo-tree-redo)
+  ("y" kill-ring-save)
+  ("p" yank)
+  ("d" delete-region)
+  ("c" string-rectangle)
+
+  ;; Selection
+  ("v" set-mark-command)
+  ("V" rectangle-mark-mode))
 
 ;;; Programming
 ;;;; General
@@ -333,6 +455,8 @@
         ("C-M-j" . sp-backward-slurp-sexp)
         ("C-s-j" . sp-backward-barf-sexp)))
 
+(show-paren-mode t)
+(setq show-paren-style 'expression)
 
 ;;;; IDE things
 (use-package project-el
@@ -392,6 +516,35 @@
   "Set local bindings for cider."
   (add-hook 'before-save-hook #'cider-format-buffer t t))
 
+(defun cider-kill-stdout-eval-handler ()
+  "Eval handler that sends any output to the kill ring."
+  (nrepl-make-response-handler
+   (current-buffer)
+   ;; value
+   nil
+   ;; output
+   (lambda (_buf out)
+     (with-current-buffer (get-buffer-create "*cider-kill-scratch*")
+       (insert (format "%s" out))))
+   ;; error
+   nil
+   ;; done
+   (lambda (_buf)
+     (with-current-buffer (get-buffer-create "*cider-kill-scratch*")
+       (kill-ring-save (point-min) (point-max))))))
+
+(defun cider-eval-defun-output-to-kill-ring ()
+  "Evaluate defun at point, send all standard out to kill ring."
+  (interactive)
+  (let* ((bounds (cider-defun-at-point t)))
+    (with-current-buffer (get-buffer-create "*cider-kill-scratch*")
+      (delete-region (point-min) (point-max)))
+    (cider-interactive-eval nil (apply-partially
+                                 'juxt* (list
+                                         (cider-kill-stdout-eval-handler)
+                                         (cider-interactive-eval-handler (current-buffer) bounds)))
+                            bounds)))
+
 (use-package flycheck-clj-kondo
   :after (flycheck cider))
 
@@ -402,7 +555,9 @@
   (require 'ob-clojure)
   :hook (clojure-mode . cider-prestart)
   :bind (:map cider-mode-map
-              ("C-, e" . 'cider-eval-commands-map))
+              ("C-, e" . 'cider-eval-commands-map)
+         :map cider-eval-commands-map
+              ("k" . 'cider-eval-defun-output-to-kill-ring))
   :config
   (setq cider-print-fn 'fipp)
   (setq clojure-toplevel-inside-comment-form t)
@@ -412,7 +567,7 @@
   (setq cider-comment-continued-prefix "       ")
   (setq cider-comment-postfix "\n")
 
-  (setq cider-clojure-cli-parameters "-A:dev -m nrepl.cmdline --middleware '%s'")
+  (setq cider-clojure-cli-aliases "dev")
   (setq cider-shadow-cljs-command "clojure -A:shadow-cljs")
   (require 'flycheck-clj-kondo))
 
