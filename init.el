@@ -456,6 +456,7 @@
         ("C-s-j" . sp-backward-barf-sexp)))
 
 (show-paren-mode t)
+(set-face-background 'show-paren-match "#432121")
 (setq show-paren-style 'expression)
 
 ;;;; IDE things
