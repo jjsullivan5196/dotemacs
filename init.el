@@ -11,10 +11,23 @@
 ;; dash!
 (use-package dash)
 
+(require 'seq)
+(require 'subr-x)
+
 ;;; Helping hands
 (defun from-userdir (path)
   "Expand relative PATH from `user-emacs-directory`."
   (expand-file-name path user-emacs-directory))
+
+(defun run-command (command)
+  "Run COMMAND in separate shell."
+  (interactive (list (read-shell-command "$ ")))
+  (start-process-shell-command command nil command))
+
+(defmacro defcmd (name cmdline)
+  `(defun ,name ()
+     (interactive)
+     (run-command ,cmdline)))
 
 (defun mime-open-file (path)
   "Open file at PATH with an appropriate application."
@@ -46,6 +59,13 @@
   (-doto user-config-file
     (save-file)
     (load)))
+
+(defun bookmark-jump-nosave (bookmark)
+  "Interactively jump to BOOKMARK without saving the window configuration."
+  (interactive
+   (list (bookmark-completing-read "Jump to bookmark"
+				   bookmark-current-bookmark)))
+  (bookmark-handle-bookmark bookmark))
 
 (defun kill-this-buffer-now ()
   "Kill the active buffer."
@@ -163,6 +183,25 @@
         '("~/.config/snip"))
   (yas-global-mode 1))
 
+(use-package mini-modeline
+  :config
+  (setq display-time-format "%a %d %b %H:%M"
+        display-time-default-load-average nil
+        mini-modeline-r-format
+        '("%e"
+          mode-line-front-space
+          mode-line-mule-info
+          mode-line-client
+          mode-line-modified
+          mode-line-remote
+          mode-line-frame-identification
+          mode-line-buffer-identification " "
+          mode-name " "
+          mode-line-position " "
+          mode-line-misc-info))
+  (display-time-mode 1)
+  (mini-modeline-mode 1))
+
 (use-package ace-window
   :config
   (custom-set-faces
@@ -171,21 +210,20 @@
           :height     4.5
           :foreground "red"))))))
 
-(use-package frames-only-mode
-  :disabled t
-  :config (frames-only-mode 1))
-
 (use-package which-key
-  :config (which-key-mode 1))
+  :config
+  (which-key-mode 1))
 
 (use-package undo-tree
-  :config (global-undo-tree-mode 1))
+  :config
+  (global-undo-tree-mode 1))
 
 (use-package hydra)
 
 (use-package ivy
   :config
-  (ivy-mode 1))
+  (ivy-mode 1)
+  (setq ivy-initial-inputs-alist nil))
 
 (use-package counsel
   :after (ivy)
@@ -198,72 +236,92 @@
   (global-set-key [remap isearch-forward] 'swiper-isearch)
   (global-set-key [remap isearch-backward] 'swiper-isearch-backward))
 
-(setq ivy-initial-inputs-alist nil)
+(use-package ivy-hydra
+  :after (swiper)
+  :config)
 
 (use-package company
-  :config (global-company-mode 1))
+  :config
+  (global-company-mode 1))
 
-(use-package sunrise
-  :straight (sunrise :type git
-                     :host github
-                     :repo "sunrise-commander/sunrise-commander"))
-;;; Perspectives
-(defvar perspectives-table
-  (make-hash-table :test 'equal)
-  "Holds onto saved window states to be used again later.")
+;;; Winmark
+(defun winmark-title (current-state)
+  "Format open buffer names in CURRENT-STATE for bookmarks."
+  (format "Winmark {%s}" (window-state-buffers current-state)))
 
-(comment
- (unbind-all 'perspectives-table))
+(defun winmark-make-record ()
+  "Record the current window configuration as a bookmark."
+  (let* ((current-state (window-state-get nil t))
+         (title         (winmark-title current-state)))
+    `(,title
+      (location . ,current-state)
+      (handler  . winmark-handler))))
 
-;;;; Serialization
-(defvar perspectives-file
-  (from-userdir "perspectives.dat")
-  "Location to serialize perspectives.")
+(defun winmark-handler (record)
+  "Jump to a window bookmark RECORD."
+  (-> record
+      (bookmark-prop-get 'location)
+      window-state-put))
 
-(defun save-perspectives (&optional fname)
-  "Save open perspectives to file FNAME."
+(defun winmark-set ()
+  "Create a window configuration bookmark."
   (interactive)
-  (let ((fname (or fname perspectives-file)))
-    (spit perspectives-table fname)))
-
-(defun load-perspectives (&optional fname)
-  "Load perspectives from file FNAME."
-  (interactive)
-  (let ((fname (or fname perspectives-file)))
-    (when (file-exists-p fname)
-      (setq perspectives-table
-            (or (read-first fname)
-                perspectives-table)))))
-
-(add-hook 'kill-emacs-hook 'save-perspectives)
-(add-hook 'emacs-startup-hook 'load-perspectives)
-
-;;;; Interaction
-(defun choose-perspective (prompt)
-  "Choose an open perspective with PROMPT."
-  (ivy-read prompt perspectives-table))
-
-(defun add-perspective (name window-state)
-  "Add perspective NAME with WINDOW-STATE to perspectives."
-  (interactive (list (choose-perspective "Add perspective: ")
-                     (window-state-get (frame-root-window) t)))
-  (puthash name window-state perspectives-table))
-
-(defun switch-perspective (name)
-  "Jump to NAME perspective."
-  (interactive (list (choose-perspective "Switch to: ")))
-  (let ((window-state (gethash name perspectives-table)))
-    (when window-state
-      (window-state-put window-state))))
-
-(defun remove-perspective (name)
-  "Remove NAME perspective."
-  (interactive (list (choose-perspective "Remove: ")))
-  (remhash name perspectives-table))
+  (let ((bookmark-make-record-function #'winmark-make-record))
+    (call-interactively 'bookmark-set)))
 
 ;;; Desktop
 (setq desktop-restore-frames nil)
-(desktop-save-mode 1)
+;;(desktop-save-mode 1)
+
+;;; EXWM
+(use-package exwm
+  :if (equal (getenv "EXWM_ENABLE") "true")
+  :config
+  (require 'exwm-randr)
+  (exwm-randr-enable)
+
+  (setq exwm-layout-show-all-buffers      t
+        exwm-workspace-show-all-buffers   t
+        exwm-workspace-number             4
+        exwm-randr-workspace-output-plist '(1 "LVDS-1"
+                                            2 "HDMI-2")
+        exwm-input-global-keys
+        `((,(kbd "s-SPC") . leader-command-map)
+          (,(kbd "<XF86AudioRaiseVolume>") . exwm-init/volume-up)
+          (,(kbd "<XF86AudioLowerVolume>") . exwm-init/volume-down)
+          (,(kbd "<XF86AudioMute>") . exwm-init/volume-mute)
+          (,(kbd "s-r") . exwm-reset)
+          (,(kbd "s-w") . exwm-workspace-switch)
+          (,(kbd "s-&") . run-command)))
+
+  (add-hook 'exwm-screen-change-hook 'exwm-init/screen-change)
+  (add-hook 'exwm-update-class-hook 'exwm-init/buffer-name-update)
+
+  (defun exwm-init/xrandr-cmd ()
+    "Format display arguments for xrandr."
+    (let ((outputs (seq-filter 'stringp exwm-randr-workspace-output-plist)))
+      (concat "xrandr --output "
+              (string-join outputs " --right-of ")
+              " --auto")))
+
+  (defcmd exwm-init/screen-change
+    (exwm-init/xrandr-cmd))
+
+  (defcmd exwm-init/volume-up
+    "pactl set-sink-volume '@DEFAULT_SINK@' +5%")
+
+  (defcmd exwm-init/volume-down
+    "pactl set-sink-volume '@DEFAULT_SINK@' -5%")
+
+  (defcmd exwm-init/volume-mute
+    "pactl set-sink-mute '@DEFAULT_SINK@' toggle")
+
+  (defun exwm-init/buffer-name-update ()
+    "Set buffer name to window class."
+    (exwm-workspace-rename-buffer exwm-class-name))
+
+  ;; Enable EXWM
+  (exwm-enable))
 
 ;;; Markup
 (use-package yaml-mode
@@ -306,6 +364,10 @@
  :map dired-mode-map
  ("C-c C-o" . dired-open-at-point))
 
+(bind-keys
+ :map bookmark-map
+ ("B" . bookmark-jump-nosave))
+
 ;;;; Global binds
 (bind-keys
  :map global-keys-mode-map
@@ -334,6 +396,9 @@
  ("n" . swiper-isearch)
  ("N" . swiper-isearch-backward))
 
+;; Bookmarks
+(bind-key "m" bookmark-map leader-command-map)
+
 ;; Help me
 (bind-key "h" help-map leader-command-map)
 
@@ -357,7 +422,7 @@
  :prefix "f"
  ("f" . make-frame-command)
  ("k" . delete-frame)
- ("c" . remove-perspective))
+ ("v" . winmark-set))
 
 (defhydra hydra-frame-windows (leader-command-map "w")
   ("q" nil "quit")
@@ -372,9 +437,7 @@
   ("b" split-window-right "split vertically")
   ("B" split-window-below "split horizontally")
   ("u" winner-undo "undo change")
-  ("U" winner-redo "redo change")
-  ("v" switch-perspective "change perspective")
-  ("V" add-perspective "save perspective"))
+  ("U" winner-redo "redo change"))
 
 ;;; Editing Shortcuts
 (defhydra hydra-edit (global-keys-mode-map "<C-backspace>")
@@ -399,7 +462,7 @@
   ("U" undo-tree-redo)
   ("y" kill-ring-save)
   ("p" yank)
-  ("d" delete-region)
+  ("d" kill-region)
   ("o" open-line)
   ("J" join-line)
   ("c" string-rectangle)
@@ -429,7 +492,7 @@
   ("U" undo-tree-redo)
   ("y" kill-ring-save)
   ("p" yank)
-  ("d" delete-region)
+  ("d" kill-region)
   ("c" string-rectangle)
 
   ;; Selection
