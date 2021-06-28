@@ -5,8 +5,14 @@
 (add-to-list 'load-path
              (expand-file-name "vendor/" user-emacs-directory))
 
-;; enable package manager
-(require 'straight-init)
+;; enable straight when guix isn't available
+;; if we do have guix, refresh the load path for new packages
+(let ((guix-profile (getenv "GUIX_PROFILE")))
+  (if (not (getenv "GUIX_PROFILE"))
+      (require 'straight-init)
+    (progn
+      (load "subdirs")
+      (require 'use-package))))
 
 ;; dash!
 (use-package dash)
@@ -25,6 +31,7 @@
   (start-process-shell-command command nil command))
 
 (defmacro defcmd (name cmdline)
+  "Define a function NAME to run CMDLINE with the shell."
   `(defun ,name ()
      (interactive)
      (run-command ,cmdline)))
@@ -64,7 +71,7 @@
   "Interactively jump to BOOKMARK without saving the window configuration."
   (interactive
    (list (bookmark-completing-read "Jump to bookmark"
-				   bookmark-current-bookmark)))
+				                           bookmark-current-bookmark)))
   (bookmark-handle-bookmark bookmark))
 
 (defun kill-this-buffer-now ()
@@ -72,6 +79,11 @@
   (interactive)
   (-> (window-buffer)
       kill-buffer))
+
+(defun indent-buffer ()
+  "Run `indent-region` on the entire buffer."
+  (interactive)
+  (indent-region (point-min) (point-max)))
 
 (defun juxt* (fns &rest args)
   "Apply list of functions FNS to ARGS, return a list of corresponding results."
@@ -100,6 +112,13 @@
 
 (defalias 'do 'progn)
 
+(defcmd net-settings
+  "cmst -Md")
+
+;;; The Journal
+(comment
+
+ '...)
 ;;; Configure default behavior
 ;; Set config sources
 (defvar user-config-file
@@ -169,19 +188,227 @@
 (setq-default org-confirm-babel-evaluate nil)
 (setq org-image-actual-width '(400))
 
+;;; Keys
+;;;; General
+(use-package hydra)
+
+(setq global-keys-mode-map (make-sparse-keymap))
+
+(define-minor-mode global-keys-mode
+  "Mode for global keybinds without messing with global keymap."
+  :global t
+  :keymap global-keys-mode-map)
+
+(global-keys-mode 1)
+
+(require 'dired)
+
+(bind-keys
+ :map dired-mode-map
+ ("C-c C-o" . dired-open-at-point))
+
+(bind-keys
+ :map bookmark-map
+ ("B" . bookmark-jump-nosave))
+
+;;;; Global binds
+(bind-keys
+ :map global-keys-mode-map
+ ;; Ibuffer
+ ([remap list-buffers] . ibuffer)
+
+ ;; Font size
+ ("C-=" . text-scale-increase)
+ ("C--" . text-scale-decrease)
+ ("C-+" . (lambda () (interactive) (text-scale-set 0)))
+
+ ;; Config
+ ("<f9>"  . config-reinit)
+ ("<f12>" . edit-user-config))
+
+;;;; Leader
+;;;;; General commands
+(bind-keys
+ :map global-keys-mode-map
+ :prefix-map leader-command-map
+ :prefix "M-SPC"
+ ;; Exec commands
+ ("<SPC>" . execute-extended-command))
+
+;; Bookmarks
+(bind-key "m" bookmark-map leader-command-map)
+
+;; Help me
+(bind-key "h" help-map leader-command-map)
+
+;;;;; Buffers
+(bind-keys
+ :map leader-command-map
+ :prefix-map leader-buffers-map
+ :prefix "b"
+ ("f" . find-file)
+ ("g" . counsel-git)
+ ("b" . switch-to-buffer)
+ ("r" . revert-buffer)
+ ("k" . kill-this-buffer-now)
+ ("s" . save-buffer)
+ ("w" . write-file))
+
+;;;;; Frames
+(bind-keys
+ :map leader-command-map
+ :prefix-map leader-frames-map
+ :prefix "f"
+ ("f" . make-frame-command)
+ ("k" . delete-frame))
+
+(defhydra hydra-frame-windows (leader-command-map "w")
+  ("q" nil "quit")
+  ("j" shrink-window "shrink length")
+  ("k" enlarge-window "expand length")
+  ("h" shrink-window-horizontally "shrink width")
+  ("l" enlarge-window-horizontally "expand width")
+  ("a" ace-window "change window")
+  ("A" (lambda () (interactive) (ace-window 4)) "swap windows")
+  ("d" delete-window "delete window")
+  ("r" delete-other-windows "remove others")
+  ("b" split-window-right "split vertically")
+  ("B" split-window-below "split horizontally")
+  ("u" winner-undo "undo change")
+  ("U" winner-redo "redo change"))
+
+;;; Editing Shortcuts
+(defhydra hydra-edit (global-keys-mode-map "<C-backspace>"
+                                           :foreign-keys run)
+  ("q" nil "quit")
+
+  ;; Navigation
+  ("n" consult-line)
+  ("j" next-line)
+  ("k" previous-line)
+  ("h" backward-char)
+  ("l" forward-char)
+  ("e" forward-word)
+  ("w" backward-word)
+  ("]" forward-paragraph)
+  ("[" backward-paragraph)
+  ("H" move-beginning-of-line)
+  ("L" move-end-of-line)
+
+  ;; Editing
+  ("u" undo-tree-undo)
+  ("U" undo-tree-redo)
+  ("y" kill-ring-save)
+  ("p" yank)
+  ("d" kill-region)
+  ("o" open-line)
+  ("J" join-line)
+  ("c" string-rectangle)
+  ("C" comment-dwim)
+  ("I" indent-buffer)
+
+  ;; Selection
+  ("v" set-mark-command)
+  ("V" rectangle-mark-mode))
+
+(defhydra hydra-sp-edit (global-keys-mode-map "<C-S-backspace>"
+                                              :foreign-keys run)
+  ("q" nil "quit")
+
+  ;; Navigation
+  ("n" consult-line)
+  ("j" sp-forward-sexp)
+  ("k" sp-backward-sexp)
+  ("h" sp-up-sexp)
+  ("l" sp-down-sexp)
+
+  ;; Editing
+  ("." sp-forward-slurp-sexp)
+  ("," sp-forward-barf-sexp)
+  ("J" sp-transpose-sexp)
+  ("K" (sp-transpose-sexp -1))
+  ("u" undo-tree-undo)
+  ("U" undo-tree-redo)
+  ("y" kill-ring-save)
+  ("p" yank)
+  ("d" kill-region)
+  ("c" string-rectangle)
+  ("C" comment-dwim)
+  ("I" indent-buffer)
+
+  ;; Selection
+  ("v" set-mark-command)
+  ("V" rectangle-mark-mode))
+
 ;;; Editor stuff
+(use-package which-key
+  :config
+  (which-key-mode 1))
+
+(use-package undo-tree
+  :config
+  (global-undo-tree-mode 1))
+
+(use-package vertico
+  :config
+  (vertico-mode 1))
+
+(use-package consult
+  :bind (:map leader-command-map
+              ("n" . consult-line)
+         :map global-keys-mode-map
+              ("C-s" . consult-line)
+              ;; Custom M-# bindings for fast register access
+              ;;("M-#"      . consult-register-load)
+              ;;("M-'"      . consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
+              ;;("C-M-#"    . consult-register)
+              ;; Other custom bindings
+              ;;("M-y"      . consult-yank-pop)                ;; orig. yank-pop
+              ;;("<help> a" . consult-apropos)            ;; orig. apropos-command
+              ;; M-g bindings (goto-map)
+              ;;("M-g e"    . consult-compile-error)
+              ;;("M-g f"    . consult-flymake)               ;; Alternative: consult-flycheck
+              ;;("M-g g"    . consult-goto-line)             ;; orig. goto-line
+              ;;("M-g M-g"  . consult-goto-line)           ;; orig. goto-line
+              ;;("M-g o"    . consult-outline)               ;; Alternative: consult-org-heading
+              ;;("M-g m"    . consult-mark)
+              ;;("M-g k"    . consult-global-mark)
+              ;;("M-g i"    . consult-imenu)
+              ;;("M-g I"    . consult-project-imenu)
+              ;; M-s bindings (search-map)
+              ;;("M-s f"    . consult-find)
+              ;;("M-s L"    . consult-locate)
+              ;;("M-s g"    . consult-grep)
+              ;;("M-s G"    . consult-git-grep)
+              ;;("M-s r"    . consult-ripgrep)
+              ;;("M-s l"    . consult-line)
+              ;;("M-s m"    . consult-multi-occur)
+              ;;("M-s k"    . consult-keep-lines)
+              ;;("M-s u"    . consult-focus-lines)
+              ;; Isearch integration
+              ;;("M-s e"    . consult-isearch)
+              ))
+
+(use-package wgrep)
+
+(use-package company
+  :config
+  (global-company-mode 1))
+
 (use-package outshine)
 
 (use-package exec-path-from-shell
+  :if (string-equal system-type "darwin")
   :config
-  (when (string-equal system-type "darwin")
-    (exec-path-from-shell-initialize)))
+  (exec-path-from-shell-initialize))
 
 (use-package yasnippet
   :config
   (setq yas-snippet-dirs
-        '("~/.config/snip"))
+        (list (from-userdir "snip")))
   (yas-global-mode 1))
+
+(use-package vterm)
 
 (use-package mini-modeline
   :config
@@ -207,44 +434,14 @@
   (custom-set-faces
    '(aw-leading-char-face
      ((t (:inherit    ace-jump-face-foreground
-          :height     4.5
-          :foreground "red"))))))
+                      :height     4.5
+                      :foreground "red"))))))
 
-(use-package which-key
-  :config
-  (which-key-mode 1))
+(use-package geiser-guile)
 
-(use-package undo-tree
-  :config
-  (global-undo-tree-mode 1))
+(use-package geiser)
 
-(use-package hydra)
-
-(use-package ivy
-  :config
-  (ivy-mode 1)
-  (setq ivy-initial-inputs-alist nil))
-
-(use-package counsel
-  :after (ivy)
-  :config
-  (counsel-mode 1))
-
-(use-package swiper
-  :after (ivy)
-  :config
-  (global-set-key [remap isearch-forward] 'swiper-isearch)
-  (global-set-key [remap isearch-backward] 'swiper-isearch-backward))
-
-(use-package ivy-hydra
-  :after (swiper)
-  :config)
-
-(use-package wgrep)
-
-(use-package company
-  :config
-  (global-company-mode 1))
+(use-package guix)
 
 ;;; Winmark
 (defun winmark-title (current-state)
@@ -271,6 +468,8 @@
   (let ((bookmark-make-record-function #'winmark-make-record))
     (call-interactively 'bookmark-set)))
 
+(bind-key "v" 'winmark-set 'leader-frames-map)
+
 ;;; Desktop
 (setq desktop-restore-frames nil)
 ;;(desktop-save-mode 1)
@@ -286,7 +485,7 @@
         exwm-workspace-show-all-buffers   t
         exwm-workspace-number             4
         exwm-randr-workspace-output-plist '(1 "LVDS-1"
-                                            2 "HDMI-2")
+                                              2 "HDMI-2")
         exwm-input-global-keys
         `((,(kbd "s-SPC") . leader-command-map)
           (,(kbd "<XF86AudioRaiseVolume>") . exwm-init/volume-up)
@@ -345,161 +544,12 @@
     (erase-buffer)))
 
 ;;; Innernet
-(use-package w3m
-  :disabled)
+(use-package w3m)
 
 (use-package web-search
+  :disabled t
   :init (setq web-search-default-provider "DuckDuckGo")
   :bind ("C-c w" . web-search))
-
-;;; Keys
-(setq global-keys-mode-map (make-sparse-keymap))
-
-(define-minor-mode global-keys-mode
-  "Mode for global keybinds without messing with global keymap."
-  :global t
-  :keymap global-keys-mode-map)
-
-(global-keys-mode 1)
-
-(bind-keys
- :map dired-mode-map
- ("C-c C-o" . dired-open-at-point))
-
-(bind-keys
- :map bookmark-map
- ("B" . bookmark-jump-nosave))
-
-;;;; Global binds
-(bind-keys
- :map global-keys-mode-map
- ;; Ibuffer
- ([remap list-buffers] . ibuffer)
-
- ;; Font size
- ("C-=" . text-scale-increase)
- ("C--" . text-scale-decrease)
- ("C-+" . (lambda () (interactive) (text-scale-set 0)))
-
- ;; Config
- ("<f9>"  . config-reinit)
- ("<f12>" . edit-user-config))
-
-;;;; Leader
-;; General commands
-(bind-keys
- :map global-keys-mode-map
- :prefix-map leader-command-map
- :prefix "M-SPC"
- ;; Exec commands
- ("<SPC>" . counsel-M-x)
-
- ;; Interactive search
- ("n" . swiper-isearch)
- ("N" . swiper-isearch-backward))
-
-;; Bookmarks
-(bind-key "m" bookmark-map leader-command-map)
-
-;; Help me
-(bind-key "h" help-map leader-command-map)
-
-;; Buffers
-(bind-keys
- :map leader-command-map
- :prefix-map leader-buffers-map
- :prefix "b"
- ("f" . find-file)
- ("g" . counsel-git)
- ("b" . switch-to-buffer)
- ("r" . revert-buffer)
- ("k" . kill-this-buffer-now)
- ("s" . save-buffer)
- ("w" . write-file))
-
-;; Frames
-(bind-keys
- :map leader-command-map
- :prefix-map leader-frames-map
- :prefix "f"
- ("f" . make-frame-command)
- ("k" . delete-frame)
- ("v" . winmark-set))
-
-(defhydra hydra-frame-windows (leader-command-map "w")
-  ("q" nil "quit")
-  ("j" shrink-window "shrink length")
-  ("k" enlarge-window "expand length")
-  ("h" shrink-window-horizontally "shrink width")
-  ("l" enlarge-window-horizontally "expand width")
-  ("a" ace-window "change window")
-  ("A" (lambda () (interactive) (ace-window 4)) "swap windows")
-  ("d" delete-window "delete window")
-  ("r" delete-other-windows "remove others")
-  ("b" split-window-right "split vertically")
-  ("B" split-window-below "split horizontally")
-  ("u" winner-undo "undo change")
-  ("U" winner-redo "redo change"))
-
-;;; Editing Shortcuts
-(defhydra hydra-edit (global-keys-mode-map "<C-backspace>")
-  ("q" nil "quit")
-
-  ;; Navigation
-  ("n" swiper-isearch)
-  ("N" swiper-isearch-backward)
-  ("j" next-line)
-  ("k" previous-line)
-  ("h" backward-char)
-  ("l" forward-char)
-  ("e" forward-word)
-  ("w" backward-word)
-  ("]" forward-paragraph)
-  ("[" backward-paragraph)
-  ("H" move-beginning-of-line)
-  ("L" move-end-of-line)
-
-  ;; Editing
-  ("u" undo-tree-undo)
-  ("U" undo-tree-redo)
-  ("y" kill-ring-save)
-  ("p" yank)
-  ("d" kill-region)
-  ("o" open-line)
-  ("J" join-line)
-  ("c" string-rectangle)
-
-  ;; Selection
-  ("v" set-mark-command)
-  ("V" rectangle-mark-mode))
-
-(defhydra hydra-sp-edit (global-keys-mode-map "<C-S-backspace>")
-  ("q" nil "quit")
-
-  ;; Navigation
-  ("n" swiper-isearch)
-  ("N" swiper-isearch-backward)
-  ("j" sp-forward-sexp)
-  ("k" sp-backward-sexp)
-  ("h" sp-up-sexp)
-  ("l" sp-down-sexp)
-  ("]" forward-paragraph)
-  ("[" backward-paragraph)
-
-  ;; Editing
-  ("." sp-forward-slurp-sexp)
-  ("," sp-forward-barf-sexp)
-  ("w" sp-transpose-sexp)
-  ("u" undo-tree-undo)
-  ("U" undo-tree-redo)
-  ("y" kill-ring-save)
-  ("p" yank)
-  ("d" kill-region)
-  ("c" string-rectangle)
-
-  ;; Selection
-  ("v" set-mark-command)
-  ("V" rectangle-mark-mode))
 
 ;;; Programming
 ;;;; General
@@ -526,7 +576,7 @@
 
 ;;;; IDE things
 (use-package project-el
-  :disabled
+  :disabled t
   :straight (project-el :type git
                         :host github
                         :repo "jorgenschaefer/project-el"
@@ -536,7 +586,9 @@
   :after (project-el))
 
 (use-package flycheck
-  :config (global-flycheck-mode 1))
+  :config
+  (setq flycheck-display-errors-function nil)
+  (global-flycheck-mode 1))
 
 (use-package expand-region
   :bind (:map leader-command-map
@@ -547,12 +599,8 @@
 (use-package magit
   :config (setq project-switch-commands nil))
 
-(use-package direnv
-  :config (direnv-mode))
-
 (use-package nix-mode
   :mode "\\.nix\\'")
-
 
 ;;;; C/C++
 ;;(use-package helm-gtags)
@@ -612,6 +660,7 @@
                             bounds)))
 
 (use-package flycheck-clj-kondo
+  :disabled t
   :after (flycheck cider))
 
 (use-package cider
@@ -622,7 +671,7 @@
   :hook (clojure-mode . cider-prestart)
   :bind (:map cider-mode-map
               ("C-, e" . 'cider-eval-commands-map)
-         :map cider-eval-commands-map
+              :map cider-eval-commands-map
               ("k" . 'cider-eval-defun-output-to-kill-ring))
   :config
   (setq cider-print-fn 'fipp)
@@ -647,15 +696,8 @@
          ("\\.tsx\\'" . rjsx-mode))
   :config (setq js2-strict-missing-semi-warning nil))
 
-(use-package coffee-mode)
-
-(use-package svelte-mode)
-
-(use-package qml-mode)
-
-(use-package haxe-mode)
-
-(use-package vue-mode)
+(use-package svelte-mode
+  :disabled t)
 
 (use-package tide
   :after (rjsx-mode flycheck)
@@ -668,12 +710,6 @@
 ;;;; Snake
 (setq python-indent-offset 2)
 
-(use-package pipenv
-  :hook (python-mode . pipenv-mode)
-  :init
-  (setq pipenv-projectile-after-switch-function
-        #'pipenv-projectile-after-switch-extended))
-
 ;;;; Gophers
 (use-package go-mode)
 
@@ -682,6 +718,7 @@
 
 ;;;; Zig
 (use-package zig-mode
+  :disabled t
   :after (eglot)
   :config
   (add-to-list 'eglot-server-programs '(zig-mode . ("zls")))
