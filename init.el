@@ -247,7 +247,7 @@
  :prefix-map leader-buffers-map
  :prefix "b"
  ("f" . find-file)
- ("g" . counsel-git)
+ ("g" . projectile-find-file)
  ("b" . switch-to-buffer)
  ("r" . revert-buffer)
  ("k" . kill-this-buffer-now)
@@ -387,7 +387,9 @@
               ;;("M-s u"    . consult-focus-lines)
               ;; Isearch integration
               ;;("M-s e"    . consult-isearch)
-              ))
+              )
+  :config
+  (setq consult-project-root-function #'projectile-project-root))
 
 (use-package wgrep)
 
@@ -408,7 +410,8 @@
         (list (from-userdir "snip")))
   (yas-global-mode 1))
 
-(use-package vterm)
+(use-package vterm
+  :if (string-equal system-type "gnu/linux"))
 
 (use-package mini-modeline
   :config
