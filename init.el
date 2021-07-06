@@ -69,10 +69,16 @@
           (eval-print-last-sexp)))
       (load bootstrap-file nil 'nomessage)))
 
+  (defun straight/use-package-handler-advice (handler name keyword args rest state)
+    (if (equal "manual" (plist-get rest :pin))
+        (use-package-process-keywords name rest state)
+      (funcall handler name keyword args rest state)))
+
   (defun straight/install-use-package ()
     "Use straight to install all packages by default."
     (setq straight-use-package-by-default t)
-    (straight-use-package 'use-package))
+    (straight-use-package 'use-package)
+    (require 'use-package-ensure))
 
   (defun guix/install-use-package ()
     "Use guix to manage packages."
@@ -88,7 +94,9 @@
 
   (if (not guix-loaded)
     (straight/install-use-package)
-    (guix/install-use-package)))
+    (guix/install-use-package))
+
+  (advice-add 'use-package-handler/:straight :around #'straight/use-package-handler-advice))
 
 (when (and guix-loaded
            (featurep 'init))
