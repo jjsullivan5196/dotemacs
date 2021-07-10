@@ -493,6 +493,16 @@
   :custom
   (consult-project-root-function #'projectile-project-root))
 
+(use-package embark
+  :bind (:map minibuffer-local-map
+              ("C-." . embark-act)))
+
+(use-package embark-consult
+  :pin manual
+  :after (embark consult)
+  :demand t
+  :hook (embark-collect-mode . consult-preview-at-point-mode))
+
 (use-package company
   :custom
   (global-company-mode t))
