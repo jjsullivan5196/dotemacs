@@ -140,6 +140,10 @@
  defun
  (funcall my-fun)
 
+ (exwm-init/xrandr-cmd)
+
+ (exwm-init/screen-change)
+
  ...)
 
 ;; * Helping hands
@@ -665,6 +669,10 @@
 
 (use-package geiser)
 
+(use-package racket-mode
+  :bind (:map racket-mode-map
+              ("C-x C-e" . racket-eval-last-sexp)))
+
 (use-package flycheck-clj-kondo
   :straight t
   :after (flycheck))
@@ -722,7 +730,7 @@
   (cider-comment-postfix "\n")
 
   (cider-clojure-cli-aliases "dev")
-  (cider-shadow-cljs-command "clojure -A:shadow-cljs"))
+  (cider-shadow-cljs-command "clojure -M:shadow-cljs"))
 
 ;; ** Javascript
 (use-package rjsx-mode
@@ -768,8 +776,14 @@
   (defun exwm-init/xrandr-cmd ()
     "Format display arguments for xrandr."
     (let ((outputs (seq-filter 'stringp exwm-randr-workspace-monitor-plist)))
-      (concat "xrandr --output "
-              (string-join outputs " --right-of ")
+      (concat "xrandr "
+              ;; Try to turn connected displays on
+              (string-join (mapcar (lambda (out) (format "--output %s --auto" out))
+                                   outputs)
+                           " ")
+              " --output "
+              ;; Line them up from left to right
+              (string-join outputs " --left-of ")
               " --auto")))
 
   (defcmd exwm-init/screen-change
