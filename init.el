@@ -356,29 +356,6 @@
  ("s" . save-buffer)
  ("w" . write-file))
 
-;; *** Frames
-(bind-keys
- :map leader-command-map
- :prefix-map leader-frames-map
- :prefix "f"
- ("f" . make-frame-command)
- ("k" . delete-frame))
-
-(defhydra hydra-frame-windows (leader-command-map "w")
-  ("q" nil "quit")
-  ("j" shrink-window "shrink length")
-  ("k" enlarge-window "expand length")
-  ("h" shrink-window-horizontally "shrink width")
-  ("l" enlarge-window-horizontally "expand width")
-  ("a" ace-window "change window")
-  ("A" (lambda () (interactive) (ace-window 4)) "swap windows")
-  ("d" delete-window "delete window")
-  ("r" delete-other-windows "remove others")
-  ("b" split-window-right "split vertically")
-  ("B" split-window-below "split horizontally")
-  ("u" winner-undo "undo change")
-  ("U" winner-redo "redo change"))
-
 ;; ** Editing Shortcuts
 (defhydra hydra-edit (global-keys-mode-map "<C-backspace>"
                                            :foreign-keys run)
@@ -537,76 +514,9 @@
   (global-company-mode t))
 
 ;; * Windows and frames
-(use-package winner
-  :pin manual
+(use-package frames-only-mode
   :custom
-  (winner-mode t))
-
-(use-package ace-window
-  :init
-  (defun ace-window/select-advice (&rest _args)
-    (run-hooks 'ace-select-enter-hook))
-  (defun ace-window/done-advice (&rest _args)
-    (run-hooks 'ace-select-done-hook))
-  :config
-  (advice-add 'aw-select :before #'ace-window/select-advice)
-  (advice-add 'aw--done :after #'ace-window/done-advice)
-  :custom-face
-  (aw-leading-char-face
-   ((t (:inherit ace-jump-face-foreground
-                 :height     4.5
-                 :foreground "red")))))
-
-(use-package time
-  :pin manual
-  :after (mini-modeline)
-  :custom
-  (display-time-default-load-average nil)
-  (display-time-format "%a %d %b %H:%M")
-  (display-time-mode t))
-
-(use-package mini-modeline
-  :custom
-  (mini-modeline-r-format
-  '("%e"
-    mode-line-front-space
-    mode-line-mule-info
-    mode-line-client
-    mode-line-modified
-    mode-line-remote
-    mode-line-frame-identification
-    mode-line-buffer-identification " "
-    mode-name " "
-    mode-line-position " "
-    mode-line-misc-info))
-  (mini-modeline-mode t))
-
-;; ** Winmark
-(defun winmark-title (current-state)
-  "Format open buffer names in CURRENT-STATE for bookmarks."
-  (format "Winmark {%s}" (window-state-buffers current-state)))
-
-(defun winmark-make-record ()
-  "Record the current window configuration as a bookmark."
-  (let* ((current-state (window-state-get nil t))
-         (title         (winmark-title current-state)))
-    `(,title
-      (location . ,current-state)
-      (handler  . winmark-handler))))
-
-(defun winmark-handler (record)
-  "Jump to a window bookmark RECORD."
-  (-> record
-      (bookmark-prop-get 'location)
-      window-state-put))
-
-(defun winmark-set ()
-  "Create a window configuration bookmark."
-  (interactive)
-  (let ((bookmark-make-record-function #'winmark-make-record))
-    (call-interactively 'bookmark-set)))
-
-(bind-key "v" 'winmark-set 'leader-frames-map)
+  (frames-only-mode t))
 
 ;; ** Desktop
 (use-package desktop
@@ -778,98 +688,14 @@
 
 ;; ** Gophers
 (use-package go-mode)
+
 ;; ** PowerHell
 (use-package powershell-mode)
+
 ;; ** Lua
 (use-package lua-mode
   :custom
   (lua-indent-level 2))
-;; * EXWM
-(use-package exwm
-  :if (equal (getenv "EXWM_ENABLE") "true")
-  :custom
-  (exwm-layout-show-all-buffers t)
-  (exwm-workspace-show-all-buffers t)
-  (exwm-workspace-number 4)
-  (exwm-randr-workspace-monitor-plist '(1 "LVDS-1" 2 "HDMI-2"))
-  (exwm-input-global-keys
-   `((,(kbd "s-SPC") . leader-command-map)
-     (,(kbd "<XF86AudioRaiseVolume>") . exwm-init/volume-up)
-     (,(kbd "<XF86AudioLowerVolume>") . exwm-init/volume-down)
-     (,(kbd "<XF86AudioMute>") . exwm-init/volume-mute)
-     (,(kbd "s-r") . exwm-reset)
-     (,(kbd "s-w") . exwm-workspace-switch)
-     (,(kbd "s-&") . run-command)))
-  :init
-  (defun exwm-init/xrandr-cmd ()
-    "Format display arguments for xrandr."
-    (let ((outputs (seq-filter 'stringp exwm-randr-workspace-monitor-plist)))
-      (concat "xrandr "
-              ;; Try to turn connected displays on
-              (string-join (mapcar (lambda (out) (format "--output %s --auto" out))
-                                   outputs)
-                           " ")
-              " --output "
-              ;; Line them up from left to right
-              (string-join outputs " --left-of ")
-              " --auto")))
-
-  (defcmd exwm-init/screen-change
-    (exwm-init/xrandr-cmd))
-
-  (defcmd exwm-init/volume-up
-    "pactl set-sink-volume '@DEFAULT_SINK@' +5%")
-
-  (defcmd exwm-init/volume-down
-    "pactl set-sink-volume '@DEFAULT_SINK@' -5%")
-
-  (defcmd exwm-init/volume-mute
-    "pactl set-sink-mute '@DEFAULT_SINK@' toggle")
-
-  (defun exwm-init/buffer-name-update ()
-    "Set buffer name to window class."
-    (exwm-workspace-rename-buffer exwm-class-name))
-
-  (defun exwm/set-window-opacity (id &optional opacity)
-    "Set OPACITY for window ID, nil will clear the opacity setting."
-    (xcb:+request exwm--connection
-        (if opacity
-          (make-instance 'xcb:icccm:-ChangeProperty-single
-                         :window   id
-                         :property xcb:Atom:_NET_WM_WINDOW_OPACITY
-                         :type     xcb:Atom:CARDINAL
-                         :data     opacity)
-          (make-instance 'xcb:DeleteProperty
-                         :window   id
-                         :property xcb:Atom:_NET_WM_WINDOW_OPACITY)))
-    nil)
-
-  (defun exwm/set-all-windows-opacity (&optional opacity)
-    (mapc (lambda (win-id->buf)
-            (-> win-id->buf
-                car
-                (exwm/set-window-opacity opacity)))
-          exwm--id-buffer-alist)
-    (exwm-layout--refresh)
-    nil)
-
-  (defun exwm/ace-select-window-opacity ()
-    (exwm/set-all-windows-opacity #xa0000000))
-
-  (defun exwm-init/extra-ewmh ()
-    (xcb:icccm:intern-atoms exwm--connection
-                            '(_NET_WM_WINDOW_OPACITY)))
-  :config
-  (require 'exwm-randr)
-  (exwm-randr-enable)
-  (exwm-enable)
-
-  (add-hook 'exwm-init-hook #'exwm-init/extra-ewmh)
-  (add-hook 'exwm-screen-change-hook #'exwm-init/screen-change)
-  (add-hook 'exwm-update-class-hook #'exwm-init/buffer-name-update)
-
-  (add-hook 'ace-select-enter-hook #'exwm/ace-select-window-opacity)
-  (add-hook 'ace-select-done-hook #'exwm/set-all-windows-opacity))
 
 ;; * End
 (provide 'init)
