@@ -11,12 +11,11 @@
 
 (defalias '-> 'thread-first)
 (defalias '->> 'thread-last)
+(defalias 'do 'progn)
 
 (defmacro comment (&rest _)
   "Ignore anything inside here."
   nil)
-
-(defalias 'do 'progn)
 
 (defmacro doto (init &rest forms)
   "Evaluate INIT and thread it into FORMS, return the evaluated INIT."
@@ -41,6 +40,13 @@
 (defun from-userdir (path)
   "Expand relative PATH from `user-emacs-directory`."
   (expand-file-name path user-emacs-directory))
+
+(defvar cache-dir
+  (let ((xdg-cache-home (getenv "XDG_CACHE_HOME")))
+    (cond
+     (xdg-cache-home (concat xdg-cache-home "/emacs"))
+     (user-emacs-directory)))
+  "The preferred location for temp files.")
 
 ;; Location of loadable config file.
 (setq user-config-file (from-userdir "init.el"))
@@ -96,7 +102,7 @@
     (straight/install-use-package)
     (guix/install-use-package))
 
-  (advice-add 'use-package-handler/:straight :around #'straight/use-package-handler-advice))
+  (advice-add 'straight-use-package--straight-handler :around #'straight/use-package-handler-advice))
 
 (when (and guix-loaded
            (featurep 'init))
@@ -212,10 +218,25 @@
     (insert-file-contents fname)
     (read (current-buffer))))
 
+(defun buffer-lines (buf)
+  "Return all lines in BUF as a list."
+  (save-excursion
+    (with-current-buffer buf
+      (end-of-buffer)
+      (set 'buf-lines '()) ;;(list (thing-at-point 'line t)))
+      (while (not (bobp))
+        (forward-line -1)
+        (set 'buf-lines (cons (thing-at-point 'line t) buf-lines)))
+      buf-lines)))
+
 (defcmd net-settings
   "cmst -Md")
 
 ;; * General appearance
+;; pls no
+(use-package tramp
+  :pin manual)
+
 ;; truncate minibuffer display
 (setq message-truncate-lines t)
 
@@ -226,9 +247,11 @@
 (put 'narrow-to-region 'disabled nil)
 
 (custom-set-variables
- ;; backups
- '(backup-directory-alist `((".*" . ,(from-userdir "backup"))))
+ ;; backups and temp files
+ '(backup-directory-alist `((".*" . ,(concat cache-dir "/backup"))))
+ '(auto-save-list-file-prefix (concat cache-dir "/auto-save-list/.saves-"))
  '(auto-save-default nil)
+ '(tramp-persistency-file-name (concat cache-dir "/tramp"))
  '(create-lockfiles nil)
  '(backup-by-copying t)    ; Don't delink hardlinks
  '(version-control t)      ; Use version numbers on backups
@@ -436,6 +459,8 @@
     (interactive)
     (-> (dired-filename-at-point)
       mime-open-file)))
+
+(use-package project)
 
 (use-package projectile
   :bind (:map leader-buffers-map
@@ -723,6 +748,7 @@
   (clojure-indent-style 'align-arguments)
   (org-babel-clojure-backend 'cider)
   (clojure-toplevel-inside-comment-form t)
+  (cider-repl-pop-to-buffer-on-connect nil)
 
   ;; Format pretty-printed comments to appear as evaluation output
   (cider-comment-prefix "\n  #_=> ")
@@ -733,29 +759,31 @@
   (cider-shadow-cljs-command "clojure -M:shadow-cljs"))
 
 ;; ** Javascript
-(use-package rjsx-mode
-  :mode (("\\.js\\'"  . rjsx-mode)
-         ("\\.ts\\'"  . rjsx-mode)
-         ("\\.tsx\\'" . rjsx-mode))
+(use-package js
+  :pin manual
   :custom
-  (js2-strict-missing-semi-warning nil)
-  (js-indent-level 2)
-  (js-switch-indent-offset 2))
+  (js-indent-level 2))
+
+(use-package typescript-mode
+  :custom
+  (typescript-indent-level 2))
 
 (use-package svelte-mode
   :disabled t)
 
-(use-package tide
-  :after (rjsx-mode flycheck)
-  :hook ((rjsx-mode . tide-setup)
-         (rjsx-mode . tide-hl-identifier-mode)))
-
 (use-package php-mode)
 (use-package web-mode)
 
+(use-package restclient)
+
 ;; ** Gophers
 (use-package go-mode)
-
+;; ** PowerHell
+(use-package powershell-mode)
+;; ** Lua
+(use-package lua-mode
+  :custom
+  (lua-indent-level 2))
 ;; * EXWM
 (use-package exwm
   :if (equal (getenv "EXWM_ENABLE") "true")
