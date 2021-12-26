@@ -435,7 +435,9 @@
     "Opens the file under the point with `mime-open-file`."
     (interactive)
     (-> (dired-filename-at-point)
-      mime-open-file)))
+        mime-open-file))
+  :custom
+  (dired-listing-switches "-alh"))
 
 (use-package project)
 
