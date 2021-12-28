@@ -59,9 +59,6 @@
 (eval-when-compile
   (defvar bootstrap-version)
 
-  (defvar guix-loaded
-    (not (null (getenv "GUIX_PROFILE"))))
-
   (defun straight/bootstrap ()
     (let ((bootstrap-file
            (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
@@ -98,14 +95,15 @@
 
   (straight/bootstrap)
 
-  (if (not guix-loaded)
-    (straight/install-use-package)
-    (guix/install-use-package))
+  (require 'guix-emacs nil t)
+
+  (if (featurep 'guix-emacs)
+      (guix/install-use-package)
+    (straight/install-use-package))
 
   (advice-add 'straight-use-package--straight-handler :around #'straight/use-package-handler-advice))
 
-(when (and guix-loaded
-           (featurep 'init))
+(when (featurep 'guix-emacs)
   (load "subdirs"))
 
 ;; ** Path
@@ -116,39 +114,6 @@
 
 ;; * The Journal
 (comment
- (require 'checkdoc)
-
- (xcb:+request exwm--connection
-     (make-instance 'xcb:icccm:-ChangeProperty-single
-                    :property xcb:Atom:_NET_WM_WINDOW_OPACITY
-                    :window 16777219
-                    :type xcb:Atom:CARDINAL
-                    :data #xa0000000))
-
- (xcb:+request exwm--connection
-     (make-instance 'xcb:DeleteProperty
-                    :window 16777219
-                    :property xcb:Atom:_NET_WM_WINDOW_OPACITY))
-
- (exwm/set-window-opacity 16777219)
-
- (exwm/set-all-windows-opacity #xa0000000)
- (exwm/set-all-windows-opacity)
-
-
- (let ((my-fun (lambda ()
-                 (fset 'my-fun
-                       (lambda ()
-                         (message "Im cool!")))
-                 (my-fun))))
-   (funcall my-fun))
-
- defun
- (funcall my-fun)
-
- (exwm-init/xrandr-cmd)
-
- (exwm-init/screen-change)
 
  ...)
 
@@ -229,14 +194,7 @@
         (set 'buf-lines (cons (thing-at-point 'line t) buf-lines)))
       buf-lines)))
 
-(defcmd net-settings
-  "cmst -Md")
-
-;; * General appearance
-;; pls no
-(use-package tramp
-  :pin manual)
-
+;; * General customizations
 ;; truncate minibuffer display
 (setq message-truncate-lines t)
 
@@ -247,41 +205,41 @@
 (put 'narrow-to-region 'disabled nil)
 
 (custom-set-variables
- ;; backups and temp files
- '(backup-directory-alist `((".*" . ,(concat cache-dir "/backup"))))
- '(auto-save-list-file-prefix (concat cache-dir "/auto-save-list/.saves-"))
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
  '(auto-save-default nil)
- '(tramp-persistency-file-name (concat cache-dir "/tramp"))
- '(create-lockfiles nil)
- '(backup-by-copying t)    ; Don't delink hardlinks
- '(version-control t)      ; Use version numbers on backups
- '(delete-old-versions t)  ; Automatically delete excess backups
- '(kept-new-versions 20)   ; how many of the newest versions to keep
- '(kept-old-versions 5)    ; and how many of the old
-
- ;; trailing whitespace
+ '(auto-save-list-file-prefix (concat cache-dir "/auto-save-list/.saves-"))
+ '(backup-by-copying t)
+ '(backup-directory-alist `((".*" \, (concat cache-dir "/backup"))))
  '(before-save-hook '(delete-trailing-whitespace))
-
- ;; no bells pls
- '(ring-bell-function #'ignore)
-
- ;; shrink fringes to 1 pixel
- '(fringe-mode 1)
-
- ;; turn off stupid bars (in order of greatest annoyance)
- '(tool-bar-mode nil)
- '(menu-bar-mode nil)
- '(scroll-bar-mode nil)
-
- ;; line flow
+ '(create-lockfiles nil)
+ '(delete-old-versions t)
  '(fill-column 80)
-
- ;; self-care
- '(inhibit-startup-screen t)
+ '(fringe-mode 1 nil (fringe))
+ '(indent-tabs-mode nil)
  '(inhibit-startup-echo-area-message "This aint your dad's spacemacs")
- '(initial-scratch-message ";; 頑張って!\n\n")
- '(initial-major-mode #'fundamental-mode)
- '(initial-buffer-choice (lambda () (dired (getenv "HOME")))))
+ '(inhibit-startup-screen t)
+ '(initial-buffer-choice (lambda nil (dired (getenv "HOME"))))
+ '(initial-scratch-message ";; 頑張って!
+
+")
+ '(kept-new-versions 20)
+ '(kept-old-versions 5)
+ '(menu-bar-mode nil)
+ '(python-indent-offset 2)
+ '(ring-bell-function #'ignore)
+ '(safe-local-variable-values
+   '((eval modify-syntax-entry 43 "'")
+     (eval modify-syntax-entry 36 "'")
+     (eval modify-syntax-entry 126 "'")))
+ '(scroll-bar-mode nil)
+ '(sh-basic-offset 2)
+ '(standard-indent 2)
+ '(tab-width 2)
+ '(tool-bar-mode nil)
+ '(version-control t))
 
 ;; colors!
 (load-theme 'wombat t)
@@ -421,6 +379,11 @@
 
 ;; * Utilities
 ;; ** Workspaces
+(use-package tramp
+  :pin manual
+  :custom
+  (tramp-persistency-file-name (concat cache-dir "/tramp")))
+
 (use-package dired
   :pin manual
   :bind (:map dired-mode-map
@@ -559,12 +522,7 @@
 
 ;; * Programming
 ;; ** General
-(custom-set-variables
- '(indent-tabs-mode nil)
- '(tab-width 2)
- '(standard-indent 2)
- '(sh-basic-offset 2)
- '(python-indent-offset 2))
+
 
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 
@@ -704,7 +662,8 @@
 (use-package go-mode)
 
 ;; ** PowerHell
-(use-package powershell-mode)
+(use-package powershell-mode
+  :straight t)
 
 ;; ** Lua
 (use-package lua-mode
