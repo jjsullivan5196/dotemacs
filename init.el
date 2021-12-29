@@ -8,6 +8,7 @@
 ;; ** Basic procedures
 (require 'seq)
 (require 'subr-x)
+(require 'xdg)
 
 (defalias '-> 'thread-first)
 (defalias '->> 'thread-last)
@@ -40,13 +41,6 @@
 (defun from-userdir (path)
   "Expand relative PATH from `user-emacs-directory`."
   (expand-file-name path user-emacs-directory))
-
-(defvar cache-dir
-  (let ((xdg-cache-home (getenv "XDG_CACHE_HOME")))
-    (cond
-     (xdg-cache-home (concat xdg-cache-home "/emacs"))
-     (user-emacs-directory)))
-  "The preferred location for temp files.")
 
 ;; Location of loadable config file.
 (setq user-config-file (from-userdir "init.el"))
@@ -208,10 +202,9 @@
 
 (custom-set-variables
  ;; backups and temp files
- '(backup-directory-alist `((".*" . ,(concat cache-dir "/backup"))))
- '(auto-save-list-file-prefix (concat cache-dir "/auto-save-list/.saves-"))
+ '(backup-directory-alist `((".*" . ,(expand-file-name "backup" (xdg-cache-home)))))
+ '(auto-save-list-file-prefix (expand-file-name "auto-save-list/.saves-" (xdg-cache-home)))
  '(auto-save-default nil)
- '(tramp-persistency-file-name (concat cache-dir "/tramp"))
  '(create-lockfiles nil)
  '(backup-by-copying t)    ; Don't delink hardlinks
  '(version-control t)      ; Use version numbers on backups
@@ -383,7 +376,7 @@
 (use-package tramp
   :pin manual
   :custom
-  (tramp-persistency-file-name (concat cache-dir "/tramp")))
+  (tramp-persistency-file-name (expand-file-name "tramp" (xdg-cache-home))))
 
 (use-package dired
   :pin manual
