@@ -88,7 +88,9 @@
     (require 'use-package)
     (setq use-package-ensure-function #'ignore)
     (use-package guix
-      :commands guix))
+      :commands guix
+      :config
+      (setq guix-current-profile guix-user-profile)))
 
   ;; need to push customization after load, for most customizations to work
   (setq use-package-keywords '(:pin :ensure :disabled :load-path :requires :defines :functions :preface :if :when :unless :no-require :catch :after :bind :bind* :bind-keymap :bind-keymap* :interpreter :mode :magic :magic-fallback :hook :commands :init :defer :demand :load :config :custom :custom-face :diminish :delight))
