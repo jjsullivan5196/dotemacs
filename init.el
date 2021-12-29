@@ -207,41 +207,40 @@
 (put 'narrow-to-region 'disabled nil)
 
 (custom-set-variables
- ;; custom-set-variables was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- '(auto-save-default nil)
+ ;; backups and temp files
+ '(backup-directory-alist `((".*" . ,(concat cache-dir "/backup"))))
  '(auto-save-list-file-prefix (concat cache-dir "/auto-save-list/.saves-"))
- '(backup-by-copying t)
- '(backup-directory-alist `((".*" \, (concat cache-dir "/backup"))))
- '(before-save-hook '(delete-trailing-whitespace))
+ '(auto-save-default nil)
+ '(tramp-persistency-file-name (concat cache-dir "/tramp"))
  '(create-lockfiles nil)
- '(delete-old-versions t)
- '(fill-column 80)
- '(fringe-mode 1 nil (fringe))
- '(indent-tabs-mode nil)
- '(inhibit-startup-echo-area-message "This aint your dad's spacemacs")
- '(inhibit-startup-screen t)
- '(initial-buffer-choice (lambda nil (dired (getenv "HOME"))))
- '(initial-scratch-message ";; 頑張って!
+ '(backup-by-copying t)    ; Don't delink hardlinks
+ '(version-control t)      ; Use version numbers on backups
+ '(delete-old-versions t)  ; Automatically delete excess backups
+ '(kept-new-versions 20)   ; how many of the newest versions to keep
+ '(kept-old-versions 5)    ; and how many of the old
 
-")
- '(kept-new-versions 20)
- '(kept-old-versions 5)
- '(menu-bar-mode nil)
- '(python-indent-offset 2)
+ ;; trailing whitespace
+ '(before-save-hook '(delete-trailing-whitespace))
+
+ ;; no bells pls
  '(ring-bell-function #'ignore)
- '(safe-local-variable-values
-   '((eval modify-syntax-entry 43 "'")
-     (eval modify-syntax-entry 36 "'")
-     (eval modify-syntax-entry 126 "'")))
- '(scroll-bar-mode nil)
- '(sh-basic-offset 2)
- '(standard-indent 2)
- '(tab-width 2)
+
+ ;; shrink fringes to 1 pixel
+ '(fringe-mode 1)
+
+ ;; turn off stupid bars (in order of greatest annoyance)
  '(tool-bar-mode nil)
- '(version-control t))
+ '(menu-bar-mode nil)
+ '(scroll-bar-mode nil)
+
+ ;; line flow
+ '(fill-column 80)
+
+ ;; self-care
+ '(inhibit-startup-screen t)
+ '(inhibit-startup-echo-area-message "This aint your dad's spacemacs")
+ '(initial-scratch-message ";; 頑張って!\n\n")
+ '(initial-buffer-choice (lambda () (dired (getenv "HOME")))))
 
 ;; colors!
 (load-theme 'wombat t)
