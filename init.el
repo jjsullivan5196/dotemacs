@@ -199,8 +199,9 @@
 
 (custom-set-variables
  ;; backups and temp files
- '(backup-directory-alist `((".*" . ,(expand-file-name "backup" (xdg-cache-home)))))
- '(auto-save-list-file-prefix (expand-file-name "auto-save-list/.saves-" (xdg-cache-home)))
+ '(backup-directory-alist `((".*" . ,(expand-file-name "emacs/backup" (xdg-cache-home)))))
+ '(undo-tree-history-directory-alist `((".*" . ,(expand-file-name "emacs/undo" (xdg-cache-home)))))
+ '(auto-save-list-file-prefix (expand-file-name "emacs/auto-save-list/.saves-" (xdg-cache-home)))
  '(auto-save-default nil)
  '(create-lockfiles nil)
  '(backup-by-copying t)    ; Don't delink hardlinks
@@ -373,7 +374,7 @@
 (use-package tramp
   :pin manual
   :custom
-  (tramp-persistency-file-name (expand-file-name "tramp" (xdg-cache-home))))
+  (tramp-persistency-file-name (expand-file-name "emacs/tramp" (xdg-cache-home))))
 
 (use-package dired
   :pin manual
