@@ -42,9 +42,6 @@
   "Expand relative PATH from `user-emacs-directory`."
   (expand-file-name path user-emacs-directory))
 
-;; Location of loadable config file.
-(setq user-config-file (from-userdir "init.el"))
-
 ;; ** Loading packages
 ;; load modules from config dir
 (add-to-list 'load-path (from-userdir "vendor/"))
@@ -128,7 +125,7 @@
 (defun edit-user-config ()
   "Edit the main configuration file."
   (interactive)
-  (find-file user-config-file))
+  (find-file user-init-file))
 
 (defun save-file (fname)
   "Save any change to file at path FNAME."
@@ -141,7 +138,7 @@
 (defun config-reinit ()
   "Reload init."
   (interactive)
-  (doto user-config-file
+  (doto user-init-file
     save-file
     load))
 
