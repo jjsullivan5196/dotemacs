@@ -1,24 +1,16 @@
 ** My (pretty small) emacs config
-This is my first try at making a fairly-detailed emacs config by hand. I've had
-previous experience with spacemacs, but (for me) it was kinda sluggish and I
-didn't really understand all the things they were doing under the hood.
+It's an init file, and I think it's pretty neat.
 
-I started with this config so I could have a good grip on everything I was
-adding to the editor. I also show a preference in here for idiomatic and
-declarative configuration, use of helper modules provided by the community (such
-as the [[https://github.com/raxod502/straight.el][straight package manager]]), and neatly-kept passages using
-~outshine-mode~.
-
-** Some 'features'
+** Some things worth stealing
 
  - An inital configuration to make emacs a bit more modern looking and less
    annoying, without bloating it to death
- - Packages installed and configured with [[https://github.com/raxod502/straight.el][straight]] and [[https://github.com/jwiegley/use-package][use-package]]
+ - Packages configured with [[https://www.emacswiki.org/emacs/SetupEl][setup.el]]
+ - Declarative package management with [[https://github.com/raxod502/straight.el][straight]] or [[https://guix.gnu.org/][guix]]
  - Decent amount of configured packages for everyday things (programming
    helpers, completion with ivy/company, magit)
  - Never forget another key chord with [[https://github.com/justbur/emacs-which-key][which-key]]
  - Some helper functions for getting around quick, one key to open conifg file
-   in new frame
 
 ** License
 

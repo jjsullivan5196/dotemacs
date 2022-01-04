@@ -4,22 +4,124 @@
 ;;; loads my packages
 ;;;
 ;;; Code:
+;; * Loading packages
+(defvar packages-file (expand-file-name "packages" user-emacs-directory))
+
+;; ** Guix
+(defvar guix-init-manifest
+  (expand-file-name "manifest.scm" user-emacs-directory))
+
+(defvar guix-init-profile
+  (expand-file-name "init-package-profile" user-emacs-directory))
+
+(defun guix-emacs-add-profile (profile)
+  "Add PROFILE to the load path."
+  (interactive (list guix-init-profile))
+  (let ((site-lisp (expand-file-name "share/emacs/site-lisp" profile)))
+    (add-to-list 'load-path site-lisp)
+    (load (expand-file-name "subdirs" site-lisp))))
+
+(defun guix-apply-manifest-sync (profile manifest)
+  "Update PROFILE with the contents of MANIFEST, return when the new profile is ready."
+  (guix-eval-read (prin1-to-string
+                   `(guix-command "package"
+		                              "-p" ,profile
+		                              "-m" ,manifest))))
+
+(defun guix-emacs-update-packages ()
+  "Sync the init profile and autoload all packages."
+  (interactive)
+  (require 'guix-repl)
+  (guix-apply-manifest-sync guix-init-profile guix-init-manifest)
+  (guix-emacs-add-profile guix-init-profile)
+  (guix-emacs-autoload-packages))
+
+;; ** Straight
+(defun read-first (fname)
+  "Read first object from file FNAME."
+  (with-temp-buffer
+    (insert-file-contents fname)
+    (read (current-buffer))))
+
+(defun straight-update-packages ()
+  "Sync straight with the packages list and autoload all packages."
+  (dolist (pkg (cadr (read-first packages-file)))
+    (straight-use-package pkg)))
+
 ;; * Environment
-;; ** Basic procedures
-(require 'seq)
-(require 'subr-x)
-(require 'xdg)
+(require 'setup)
 
-(defalias '-> 'thread-first)
-(defalias '->> 'thread-last)
-(defalias 'do 'progn)
+(setup init/bootstrap
+  (:require xdg seq subr-x)
 
+  (when (string-equal system-type "darwin")
+    (:require exec-path-from-shell)
+    (exec-path-from-shell-initialize))
+
+  (put 'thread-first 'lisp-indent-function nil)
+  (put 'thread-last 'lisp-indent-function nil)
+
+  (defalias '-> 'thread-first)
+  (defalias '->> 'thread-last)
+  (defalias 'do 'progn))
+
+(setup setup/extras
+  (defun set-both (name x)
+    "Bind NAME to X in both namespaces."
+    (set name x)
+    (fset name x))
+
+  (setup-define :keymap
+    (lambda (name)
+      `(set-both ',name (make-sparse-keymap)))
+    :documentation "Set NAME to a new keymap."
+    :repeatable t)
+
+  (setup-define :minor-mode
+    (lambda (name &rest minor-mode-opts)
+      (let ((mode-map (intern (concat (symbol-name name) "-map"))))
+	      `(progn
+	         (set-both ',mode-map (make-sparse-keymap))
+	         (define-minor-mode ,name
+	           ,@minor-mode-opts
+	           :keymap ,mode-map)
+	         (provide ',name))))
+    :documentation "Create a minor mode NAME, with a corresponding keymap.
+
+MINOR-MODE-OPTS will be passed to `define-minor-mode'. This macro
+can be used as NAME, and will replace itself with the name of the
+new minor mode."
+    :shorthand #'cadr
+    :indent 1)
+
+  (setup-define :hydra
+    (lambda (name opts &rest defs)
+      `(defhydra ,name (,(setup-get 'map) ,@opts)
+         ,@defs))
+    :documentation "Bind a new hydra using the local keymap."
+    :indent 2)
+
+  (setup-define :use-global-mode
+    (lambda (name)
+      (let ((mode (if (string-match-p "-mode\\'" (symbol-name name))
+                      name
+                    (intern (format "%s-mode" name)))))
+        `(,mode t)))
+    :documentation "Activate a global minor mode by NAME.
+
+This macro can be used as NAME, and will replace itself with the
+package name of the first minor mode."
+    :repeatable t
+    :shorthand #'cadr))
+
+;; * Helping hands
 (defmacro comment (&rest _)
   "Ignore anything inside here."
   nil)
 
 (defmacro doto (init &rest forms)
   "Evaluate INIT and thread it into FORMS, return the evaluated INIT."
+  (declare (indent 1))
   (let ((init-var (make-symbol "init-var")))
     `(let ((,init-var ,init))
        ,@(mapcar (lambda (form)
@@ -38,79 +140,6 @@
   (fmakunbound sym)
   (makunbound sym))
 
-(defun from-userdir (path)
-  "Expand relative PATH from `user-emacs-directory`."
-  (expand-file-name path user-emacs-directory))
-
-;; ** Loading packages
-;; load modules from config dir
-(add-to-list 'load-path (from-userdir "vendor/"))
-
-;; package management details
-(eval-when-compile
-  (defvar bootstrap-version)
-
-  (defun straight/bootstrap ()
-    (let ((bootstrap-file
-           (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-          (bootstrap-version 5))
-      (unless (file-exists-p bootstrap-file)
-        (with-current-buffer
-            (url-retrieve-synchronously
-             "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
-             'silent 'inhibit-cookies)
-          (goto-char (point-max))
-          (eval-print-last-sexp)))
-      (load bootstrap-file nil 'nomessage)))
-
-  (defun straight/use-package-handler-advice (handler name keyword args rest state)
-    (if (equal "manual" (plist-get rest :pin))
-        (use-package-process-keywords name rest state)
-      (funcall handler name keyword args rest state)))
-
-  (defun straight/install-use-package ()
-    "Use straight to install all packages by default."
-    (setq straight-use-package-by-default t)
-    (straight-use-package 'use-package)
-    (require 'use-package-ensure))
-
-  (defun guix/install-use-package ()
-    "Use guix to manage packages."
-    (require 'use-package)
-    (setq use-package-ensure-function #'ignore)
-    (use-package guix
-      :commands guix
-      :config
-      (setq guix-current-profile guix-user-profile)))
-
-  ;; need to push customization after load, for most customizations to work
-  (setq use-package-keywords '(:pin :ensure :disabled :load-path :requires :defines :functions :preface :if :when :unless :no-require :catch :after :bind :bind* :bind-keymap :bind-keymap* :interpreter :mode :magic :magic-fallback :hook :commands :init :defer :demand :load :config :custom :custom-face :diminish :delight))
-
-  (straight/bootstrap)
-
-  (require 'guix-emacs nil t)
-
-  (if (featurep 'guix-emacs)
-      (guix/install-use-package)
-    (straight/install-use-package))
-
-  (advice-add 'straight-use-package--straight-handler :around #'straight/use-package-handler-advice))
-
-(when (featurep 'guix-emacs)
-  (load "subdirs"))
-
-;; ** Path
-(use-package exec-path-from-shell
-  :if (string-equal system-type "darwin")
-  :config
-  (exec-path-from-shell-initialize))
-
-;; * The Journal
-(comment
-
- ...)
-
-;; * Helping hands
 (defun run-command (command)
   "Run COMMAND in separate shell."
   (interactive (list (read-shell-command "$ ")))
@@ -170,12 +199,6 @@
     (print obj (current-buffer))
     (write-file fname)))
 
-(defun read-first (fname)
-  "Read first object from file FNAME."
-  (with-temp-buffer
-    (insert-file-contents fname)
-    (read (current-buffer))))
-
 (defun buffer-lines (buf)
   "Return all lines in BUF as a list."
   (save-excursion
@@ -187,200 +210,173 @@
         (set 'buf-lines (cons (thing-at-point 'line t) buf-lines)))
       buf-lines)))
 
+;; * The Journal
+(comment
+
+ (->> (file-attributes guix-init-profile)
+      (nth 4)
+      current-time-string)
+
+ ...)
+
 ;; * General customizations
-;; truncate minibuffer display
-(setq message-truncate-lines t)
+(setup init/custom
+  ;; y is y
+  (defalias 'yes-or-no-p 'y-or-n-p)
 
-;; y is y
-(defalias 'yes-or-no-p 'y-or-n-p)
+  ;; narrow?
+  (put 'narrow-to-region 'disabled nil)
 
-;; narrow?
-(put 'narrow-to-region 'disabled nil)
+  ;; colors!
+  (load-theme 'wombat t)
 
-(custom-set-variables
- ;; backups and temp files
- '(backup-directory-alist `((".*" . ,(expand-file-name "emacs/backup" (xdg-cache-home)))))
- '(undo-tree-history-directory-alist `((".*" . ,(expand-file-name "emacs/undo" (xdg-cache-home)))))
- '(auto-save-list-file-prefix (expand-file-name "emacs/auto-save-list/.saves-" (xdg-cache-home)))
- '(auto-save-default nil)
- '(create-lockfiles nil)
- '(backup-by-copying t)    ; Don't delink hardlinks
- '(version-control t)      ; Use version numbers on backups
- '(delete-old-versions t)  ; Automatically delete excess backups
- '(kept-new-versions 20)   ; how many of the newest versions to keep
- '(kept-old-versions 5)    ; and how many of the old
+  ;; font size
+  (set-face-attribute 'default nil :height 120)
 
- ;; trailing whitespace
- '(before-save-hook '(delete-trailing-whitespace))
+  ;; flat modeline
+  (set-face-attribute 'mode-line nil :box nil)
+  (set-face-attribute 'mode-line-inactive nil :box nil)
 
- ;; no bells pls
- '(ring-bell-function #'ignore)
+  (:option
+   ;; truncate minibuffer display
+   message-truncate-lines t
 
- ;; shrink fringes to 1 pixel
- '(fringe-mode 1)
+   ;; backups and temp files
+   backup-directory-alist `((".*" . ,(expand-file-name "emacs/backup" (xdg-cache-home))))
+   auto-save-list-file-prefix (expand-file-name "emacs/auto-save-list/.saves-" (xdg-cache-home))
+   auto-save-default nil
+   create-lockfiles nil
+   backup-by-copying t     ; Don't delink hardlinks
+   version-control t       ; Use version numbers on backups
+   delete-old-versions t   ; Automatically delete excess backups
+   kept-new-versions 20    ; how many of the newest versions to keep
+   kept-old-versions 5     ; and how many of the old
 
- ;; turn off stupid bars (in order of greatest annoyance)
- '(tool-bar-mode nil)
- '(menu-bar-mode nil)
- '(scroll-bar-mode nil)
+   ;; trailing whitespace
+   (prepend before-save-hook) #'delete-trailing-whitespace
 
- ;; line flow
- '(fill-column 80)
+   ;; no bells pls
+   ring-bell-function #'ignore
 
- ;; self-care
- '(inhibit-startup-screen t)
- '(inhibit-startup-echo-area-message "This aint your dad's spacemacs")
- '(initial-scratch-message ";; 頑張って!\n\n")
- '(initial-buffer-choice (lambda () (dired (getenv "HOME")))))
+   ;; shrink fringes to 1 pixel
+   fringe-mode 1
 
-;; colors!
-(load-theme 'wombat t)
+   ;; turn off stupid bars (in order of greatest annoyance)
+   tool-bar-mode nil
+   menu-bar-mode nil
+   scroll-bar-mode nil
 
-;; font size
-(set-face-attribute 'default nil :height 120)
+   ;; line flow
+   fill-column 80
 
-;; flat modeline
-(set-face-attribute 'mode-line nil :box nil)
-(set-face-attribute 'mode-line-inactive nil :box nil)
+   ;; self-care
+   inhibit-startup-screen t
+   inhibit-startup-echo-area-message "This aint your dad's spacemacs"
+   initial-scratch-message ";; 頑張って!\n\n"
+   initial-buffer-choice (lambda () (dired (getenv "HOME")))))
 
 ;; * Keys
-;; ** General
-(use-package which-key
-  :custom
-  (which-key-mode t))
+(setup (:use-global-mode which-key-mode))
 
-(use-package hydra)
+(setup (:minor-mode global-keys-mode
+	       "Mode for global keybinds without messing with the global keymap."
+	       :global t)
 
-(setq global-keys-mode-map (make-sparse-keymap))
+  (:keymap leader-command-map leader-buffers-map)
 
-(define-minor-mode global-keys-mode
-  "Mode for global keybinds without messing with global keymap."
-  :global t
-  :keymap global-keys-mode-map)
+  (:bind
+   ;; Ibuffer
+   [remap list-buffers] ibuffer
+   ;; Font size
+   "C-=" text-scale-increase
+   "C--" text-scale-decrease
+   "C-+" (lambda nil (interactive) (text-scale-set 0))
+   ;; Config
+   "<f9>" config-reinit
+   "<f12>" edit-user-config
+   ;; Leader
+   "M-SPC" leader-command-map)
 
-(global-keys-mode 1)
+  (:with-map leader-command-map
+    (:bind "<SPC>" execute-extended-command
+           "m" bookmark-map
+           "h" help-map
+           "b" leader-buffers-map))
 
-(bind-keys
- :map bookmark-map
- ("B" . bookmark-jump-nosave))
+  (:with-map leader-buffers-map
+    (:bind "f" find-file
+           "g" projectile-find-file
+           "b" switch-to-buffer
+           "r" revert-buffer
+           "k" kill-this-buffer-now
+           "s" save-buffer
+           "w" write-file))
 
-;; ** Global binds
-(bind-keys
- :map global-keys-mode-map
- ;; Ibuffer
- ([remap list-buffers] . ibuffer)
+  (:with-map bookmark-map
+    (:bind "B" bookmark-jump-nosave))
 
- ;; Font size
- ("C-=" . text-scale-increase)
- ("C--" . text-scale-decrease)
- ("C-+" . (lambda () (interactive) (text-scale-set 0)))
+  (:hydra hydra-edit ("<C-backspace>" :foreign-keys run)
+    ("q" nil "quit")
+    ;; Navigation
+    ("n" consult-line)
+    ("j" next-line)
+    ("k" previous-line)
+    ("h" backward-char)
+    ("l" forward-char)
+    ("e" forward-word)
+    ("w" backward-word)
+    ("]" forward-paragraph)
+    ("[" backward-paragraph)
+    ("H" move-beginning-of-line)
+    ("L" move-end-of-line)
+    ;; Editing
+    ("u" undo-tree-undo)
+    ("U" undo-tree-redo)
+    ("y" kill-ring-save)
+    ("p" yank)
+    ("d" kill-region)
+    ("o" open-line)
+    ("J" join-line)
+    ("c" string-rectangle)
+    ("C" comment-dwim)
+    ("I" indent-buffer)
+    ;; Selection
+    ("v" set-mark-command)
+    ("V" rectangle-mark-mode))
 
- ;; Config
- ("<f9>"  . config-reinit)
- ("<f12>" . edit-user-config))
+  (:hydra hydra-sp-edit ("<C-S-backspace>" :foreign-keys run)
+    ("q" nil "quit")
+    ;; Navigation
+    ("n" consult-line)
+    ("j" sp-forward-sexp)
+    ("k" sp-backward-sexp)
+    ("h" sp-up-sexp)
+    ("l" sp-down-sexp)
+    ;; Editing
+    ("." sp-forward-slurp-sexp)
+    ("," sp-forward-barf-sexp)
+    ("J" sp-transpose-sexp)
+    ("K" (sp-transpose-sexp -1))
+    ("u" undo-tree-undo)
+    ("U" undo-tree-redo)
+    ("y" kill-ring-save)
+    ("p" yank)
+    ("d" kill-region)
+    ("c" string-rectangle)
+    ("C" comment-dwim)
+    ("I" indent-buffer)
+    ;; Selection
+    ("v" set-mark-command)
+    ("V" rectangle-mark-mode))
 
-;; ** Leader
-;; *** General commands
-(bind-keys
- :map global-keys-mode-map
- :prefix-map leader-command-map
- :prefix "M-SPC"
- ;; Exec commands
- ("<SPC>" . execute-extended-command))
-
-;; Bookmarks
-(bind-key "m" bookmark-map leader-command-map)
-
-;; Help me
-(bind-key "h" help-map leader-command-map)
-
-;; *** Buffers
-(bind-keys
- :map leader-command-map
- :prefix-map leader-buffers-map
- :prefix "b"
- ("f" . find-file)
- ("b" . switch-to-buffer)
- ("r" . revert-buffer)
- ("k" . kill-this-buffer-now)
- ("s" . save-buffer)
- ("w" . write-file))
-
-;; ** Editing Shortcuts
-(defhydra hydra-edit (global-keys-mode-map "<C-backspace>"
-                                           :foreign-keys run)
-  ("q" nil "quit")
-
-  ;; Navigation
-  ("n" consult-line)
-  ("j" next-line)
-  ("k" previous-line)
-  ("h" backward-char)
-  ("l" forward-char)
-  ("e" forward-word)
-  ("w" backward-word)
-  ("]" forward-paragraph)
-  ("[" backward-paragraph)
-  ("H" move-beginning-of-line)
-  ("L" move-end-of-line)
-
-  ;; Editing
-  ("u" undo-tree-undo)
-  ("U" undo-tree-redo)
-  ("y" kill-ring-save)
-  ("p" yank)
-  ("d" kill-region)
-  ("o" open-line)
-  ("J" join-line)
-  ("c" string-rectangle)
-  ("C" comment-dwim)
-  ("I" indent-buffer)
-
-  ;; Selection
-  ("v" set-mark-command)
-  ("V" rectangle-mark-mode))
-
-(defhydra hydra-sp-edit (global-keys-mode-map "<C-S-backspace>"
-                                              :foreign-keys run)
-  ("q" nil "quit")
-
-  ;; Navigation
-  ("n" consult-line)
-  ("j" sp-forward-sexp)
-  ("k" sp-backward-sexp)
-  ("h" sp-up-sexp)
-  ("l" sp-down-sexp)
-
-  ;; Editing
-  ("." sp-forward-slurp-sexp)
-  ("," sp-forward-barf-sexp)
-  ("J" sp-transpose-sexp)
-  ("K" (sp-transpose-sexp -1))
-  ("u" undo-tree-undo)
-  ("U" undo-tree-redo)
-  ("y" kill-ring-save)
-  ("p" yank)
-  ("d" kill-region)
-  ("c" string-rectangle)
-  ("C" comment-dwim)
-  ("I" indent-buffer)
-
-  ;; Selection
-  ("v" set-mark-command)
-  ("V" rectangle-mark-mode))
+  (:use-global-mode global-keys-mode))
 
 ;; * Utilities
 ;; ** Workspaces
-(use-package tramp
-  :pin manual
-  :custom
-  (tramp-persistency-file-name (expand-file-name "emacs/tramp" (xdg-cache-home))))
+(setup tramp
+  (:option tramp-persistency-file-name (expand-file-name "emacs/tramp" (xdg-cache-home))))
 
-(use-package dired
-  :pin manual
-  :bind (:map dired-mode-map
-              ("C-c C-o" . dired-open-at-point))
-  :init
+(setup dired
   (defun mime-open-file (path)
     "Open file at PATH with an appropriate application."
     (make-process :name "open-file"
@@ -391,194 +387,139 @@
     (interactive)
     (-> (dired-filename-at-point)
         mime-open-file))
-  :custom
-  (dired-listing-switches "-alh"))
 
-(use-package project)
+  (:option dired-listing-switches "-alh")
+  (:bind "C-c C-o" dired-open-at-point))
 
-(use-package projectile
-  :bind (:map leader-buffers-map
-              ("g" . projectile-find-file)))
-
-(use-package magit
-  :custom
-  (project-switch-commands nil))
+(setup package
+  (:option project-switch-commands nil))
 
 ;; ** Shell
-(use-package eshell
-  :pin manual
-  :init
+(setup eshell
   (defun eshell/clear ()
     "Actually clear eshell."
     (interactive)
     (let ((inhibit-read-only t))
       (erase-buffer))))
 
-(use-package vterm
-  :commands vterm
-  :if (string-equal system-type "gnu/linux"))
-
 ;; ** Innernet
-(use-package w3m
-  :commands w3m)
-
-(use-package web-search
-  :disabled t
-  :init (setq web-search-default-provider "DuckDuckGo")
-  :bind ("C-c w" . web-search))
+(setup web-search
+  (:only-if nil)
+  (:option web-search-default-provider "DuckDuckGo")
+  (:bind "C-c w" web-search))
 
 ;; * Completion
-(use-package vertico
-  :custom
-  (vertico-mode t))
+(setup (:use-global-mode vertico marginalia)
+  (:with-feature minibuffer
+    (:with-map minibuffer-local-map
+      (:bind "C-t" marginalia-cycle)))
 
-(use-package marginalia
-  :demand t
-  :bind (:map minibuffer-local-map
-              ("C-t" . marginalia-cycle))
-  :custom
-  (marginalia-mode t))
+  (:option completion-styles '(orderless)))
 
-(use-package orderless
-  :custom
-  (completion-styles '(orderless)))
+(setup consult
+  (:with-feature global-keys-mode
+    (:bind "C-s" consult-line)
 
-(use-package consult
-  :bind (:map leader-command-map
-              ("n" . consult-line)
-         :map outline-minor-mode-map
-              ("C-c s" . (lambda ()
-                           (interactive)
-                           (consult-outline)
-                           (outline-hide-other)))
-         :map global-keys-mode-map
-              ("C-s" . consult-line))
-  :custom
-  (consult-project-root-function #'projectile-project-root))
+    (:with-map leader-command-map
+      (:bind "n" consult-line)))
 
-(use-package embark
-  :bind (:map minibuffer-local-map
-              ("C-." . embark-act)))
+  (:with-feature outline
+    (:with-map outline-minor-mode-map
+      (:bind "C-c s" (lambda ()
+                       (interactive)
+                       (consult-outline)
+                       (outline-hide-other))))))
 
-(use-package embark-consult
-  :pin manual
-  :after (embark consult)
-  :demand t
-  :hook (embark-collect-mode . consult-preview-at-point-mode))
+(setup embark
+  (:with-feature minibuffer
+    (:with-map minibuffer-local-map
+      (:bind "C-." embark-act))))
 
-(use-package company
-  :custom
-  (global-company-mode t))
+(setup company
+  (:use-global-mode global-company-mode))
 
 ;; * Windows and frames
-(use-package frames-only-mode
-  :custom
-  (frames-only-mode t))
+(setup (:use-global-mode frames-only-mode))
 
-;; ** Desktop
-(use-package desktop
-  :disabled t
-  :custom
-  (desktop-restore-frames nil)
-  (desktop-save-mode t))
+(setup desktop
+  (:only-if nil)
+  (:use-global-mode desktop-save-mode)
+  (:option desktop-restore-frames nil))
 
 ;; * Editing
-(use-package undo-tree
-  :custom
-  (global-undo-tree-mode t))
+(setup undo-tree
+  (:use-global-mode global-undo-tree-mode)
+  (:option undo-tree-history-directory-alist `((".*" . ,(expand-file-name "emacs/undo" (xdg-cache-home))))))
 
-(use-package wgrep)
+(setup yasnippet
+  (:use-global-mode yas-global-mode)
+  (:option yas-snippet-dirs (list (expand-file-name "snip" user-emacs-directory))))
 
-(use-package yasnippet
-  :custom
-  (yas-snippet-dirs (list (from-userdir "snip")))
-  (yas-global-mode t))
+(setup org
+  (:option org-babel-confirm-evaluate nil
+           org-image-actual-width '(400)))
 
-(use-package outshine
-  :hook (prog-mode . outshine-mode))
+(setup yaml-mode
+  (:file-match "\\.yml\\'"))
 
-(use-package org
-  :pin manual
-  :custom
-  (org-babel-confirm-evaluate nil)
-  (org-image-actual-width '(400)))
-
-(use-package yaml-mode
-  :mode "\\.yml\\'")
-
-(use-package markdown-mode
-  :mode "\\.md\\'"
-  :custom
-  (markdown-hide-markup nil)
-  (markdown-hide-urls t))
+(setup markdown-mode
+  (:file-match "\\.md\\'")
+  (:option markdown-hide-markup nil
+           markdown-hide-urls t))
 
 ;; * Programming
 ;; ** General
+(setup prog-mode
+  (:option indent-tabs-mode nil
+           tab-width 2
+           standard-indent 2
+           sh-basic-offset 2
+           python-indent-offset 2)
 
+  (:hook display-line-numbers-mode
+         rainbow-delimiters-mode
+         smartparens-mode
+         show-paren-mode
+         outshine-mode)
 
-(add-hook 'prog-mode-hook #'display-line-numbers-mode)
+  (:bind "C-M-k" sp-forward-slurp-sexp
+         "C-s-k" sp-forward-barf-sexp
+         "C-M-j" sp-backward-slurp-sexp
+         "C-s-j" sp-backward-barf-sexp))
 
-(use-package paren
-  :pin manual
-  :hook (prog-mode . show-paren-mode)
-  :custom (show-paren-style 'expression)
-  :config
-  (set-face-background 'show-paren-match "#432121"))
+(setup paren
+  (:when-loaded
+    (:option show-paren-style 'expression)
+    (set-face-background 'show-paren-match "#432121")))
 
-(use-package rainbow-delimiters
-  :hook (prog-mode . rainbow-delimiters-mode))
+(setup flycheck
+  (:use-global-mode global-flycheck-mode)
+  (:require flycheck-clj-kondo)
+  (:option flycheck-display-errors-function nil))
 
-(use-package smartparens
-  :hook (prog-mode . smartparens-mode)
-  :bind (:map prog-mode-map
-              ("C-M-k" . sp-forward-slurp-sexp)
-              ("C-s-k" . sp-forward-barf-sexp)
-              ("C-M-j" . sp-backward-slurp-sexp)
-              ("C-s-j" . sp-backward-barf-sexp)))
+(setup eglot
+  (:when-loaded
+    (:option (prepend eglot-server-programs) '(typescript-mode . (eglot-deno "deno" "lsp")))
 
-(use-package flycheck
-  :custom
-  (flycheck-display-errors-function nil)
-  (global-flycheck-mode t))
+    (defclass eglot-deno (eglot-lsp-server) ()
+      :documentation "A custom class for deno lsp.")
 
-(use-package flymake
-  :pin manual)
+    (cl-defmethod eglot-initialization-options ((server eglot-deno))
+      "Passes through required deno initialization options"
+      '(:enable t :lint t))))
 
-(use-package eglot
-  :config
-  (add-to-list 'eglot-server-programs '(typescript-mode . (eglot-deno "deno" "lsp")))
-
-  (defclass eglot-deno (eglot-lsp-server) ()
-    :documentation "A custom class for deno lsp.")
-
-  (cl-defmethod eglot-initialization-options ((server eglot-deno))
-    "Passes through required deno initialization options"
-    '(:enable t
-      :lint t)))
-
-(use-package expand-region
-  :bind (:map leader-command-map
-              ("." . 'er/expand-region)))
-
-(use-package nix-mode
-  :mode "\\.nix\\'")
+(setup expand-region
+  (:with-feature global-keys-mode
+    (:with-map leader-command-map
+      (:bind "." er/expand-region))))
 
 ;; ** Lisp
-(use-package geiser-guile)
+(setup racket-mode
+  (:bind "C-x C-e" racket-eval-last-sexp))
 
-(use-package geiser)
+(setup cider
+  (:require ob-clojure)
 
-(use-package racket-mode
-  :bind (:map racket-mode-map
-              ("C-x C-e" . racket-eval-last-sexp)))
-
-(use-package flycheck-clj-kondo
-  :straight t
-  :after (flycheck))
-
-(use-package cider
-  :init
-  (require 'ob-clojure)
   (defun cider-prestart ()
     "Set local bindings for cider."
     (add-hook 'before-save-hook #'cider-format-buffer t t))
@@ -612,55 +553,37 @@
                                            (cider-interactive-eval-handler (current-buffer) bounds)))
                               bounds)))
 
-  :hook (clojure-mode . cider-prestart)
-  :bind (:map cider-mode-map
-              ("C-, e" . 'cider-eval-commands-map)
-              :map cider-eval-commands-map
-              ("k" . 'cider-eval-defun-output-to-kill-ring))
-  :custom
-  (cider-print-fn 'fipp)
-  (clojure-indent-style 'align-arguments)
-  (org-babel-clojure-backend 'cider)
-  (clojure-toplevel-inside-comment-form t)
-  (cider-repl-pop-to-buffer-on-connect nil)
+  (:hook cider-prestart)
 
-  ;; Format pretty-printed comments to appear as evaluation output
-  (cider-comment-prefix "\n  #_=> ")
-  (cider-comment-continued-prefix "       ")
-  (cider-comment-postfix "\n")
+  (:bind "C-, e" cider-eval-commands-map)
+  (:with-map cider-eval-commands-map
+    (:bind "k" cider-eval-defun-output-to-kill-ring))
 
-  (cider-clojure-cli-aliases "dev")
-  (cider-shadow-cljs-command "clojure -M:shadow-cljs"))
+  (:option
+   cider-print-fn 'fipp
+   clojure-indent-style 'align-arguments
+   org-babel-clojure-backend 'cider
+   clojure-toplevel-inside-comment-form t
+   cider-repl-pop-to-buffer-on-connect nil
+
+   ;; Format pretty-printed comments to appear as evaluation output
+   cider-comment-prefix "\n  #_=> "
+   cider-comment-continued-prefix "       "
+   cider-comment-postfix "\n"
+
+   cider-clojure-cli-aliases "dev"
+   cider-shadow-cljs-command "clojure -M:shadow-cljs"))
 
 ;; ** Javascript
-(use-package js
-  :pin manual
-  :custom
-  (js-indent-level 2))
+(setup js
+  (:option js-indent-level 2))
 
-(use-package typescript-mode
-  :custom
-  (typescript-indent-level 2))
-
-(use-package svelte-mode
-  :disabled t)
-
-(use-package php-mode)
-(use-package web-mode)
-
-(use-package restclient)
-
-;; ** Gophers
-(use-package go-mode)
-
-;; ** PowerHell
-(use-package powershell-mode
-  :straight t)
+(setup typescript-mode
+  (:option typescript-indent-level 2))
 
 ;; ** Lua
-(use-package lua-mode
-  :custom
-  (lua-indent-level 2))
+(setup lua-mode
+  (:option lua-indent-level 2))
 
 ;; * End
 (provide 'init)
