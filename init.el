@@ -5,54 +5,81 @@
 ;;;
 ;;; Code:
 ;; * Loading packages
-(defvar packages-file (expand-file-name "packages" user-emacs-directory))
+(setq init-packages '(guix setup exec-path-from-shell which-key
+                           hydra project projectile magit vterm
+                           w3m vertico marginalia orderless
+                           consult embark company
+                           frames-only-mode undo-tree wgrep
+                           yasnippet outshine yaml-mode
+                           markdown-mode rainbow-delimiters
+                           smartparens flycheck eglot
+                           expand-region nix-mode geiser-guile
+                           geiser racket-mode cider
+                           typescript-mode php-mode web-mode
+                           restclient go-mode lua-mode))
+
+(require 'seq)
 
 ;; ** Guix
-(defvar guix-init-manifest
-  (expand-file-name "manifest.scm" user-emacs-directory))
+(when (require 'guix-repl nil t)
+  (defvar guix-init-profile
+    (expand-file-name "init-package-profile" user-emacs-directory))
 
-(defvar guix-init-profile
-  (expand-file-name "init-package-profile" user-emacs-directory))
+  (defun guix-emacs-profile-packages (profile)
+    "Get the emacs packages installed in PROFILE."
+    (let* ((script `(begin
+                     (use-modules (guix profiles))
+                     (manifest->code (profile-manifest ,profile))))
+           ;; god why
+           (manifest (cdr (cadadr (guix-eval-read (prin1-to-string script)))))
+           (pkgs (mapcar (lambda (s)
+                           (intern (seq-subseq s 6)))
+                         (seq-filter (apply-partially #'string-match "^emacs-.*")
+                                     manifest))))
+      pkgs))
 
-(defun guix-emacs-add-profile (profile)
-  "Add PROFILE to the load path."
-  (interactive (list guix-init-profile))
-  (let ((site-lisp (expand-file-name "share/emacs/site-lisp" profile)))
-    (add-to-list 'load-path site-lisp)
-    (load (expand-file-name "subdirs" site-lisp))))
+  (defun guix-emacs-add-profile (profile)
+    "Add PROFILE to the load path."
+    (interactive (list guix-init-profile))
+    (let ((site-lisp (expand-file-name "share/emacs/site-lisp" profile)))
+      (add-to-list 'load-path site-lisp)
+      (load (expand-file-name "subdirs" site-lisp))))
 
-(defun guix-apply-manifest-sync (profile manifest)
-  "Update PROFILE with the contents of MANIFEST, return when the new profile is ready."
-  (guix-eval-read (prin1-to-string
-                   `(guix-command "package"
-		                              "-p" ,profile
-		                              "-m" ,manifest))))
+  (defun guix-emacs-build-profile (profile pkgs)
+    "Update PROFILE with the packages in PKGS, return when the new profile is ready."
+    (let* ((specs (mapcar (apply-partially #'format "emacs-%s") pkgs))
+           (script `(begin
+                     (use-modules (guix store)
+                                  (guix scripts package)
+                                  (gnu packages))
+                     (with-profile-lock
+                      ,profile
+                      (build-and-use-profile
+                       (open-connection)
+                       ,profile
+                       (specifications->manifest (list "emacs" ,@specs)))))))
+      (guix-eval-read (prin1-to-string script))))
 
-(defun guix-emacs-update-packages ()
-  "Sync the init profile and autoload all packages."
-  (interactive)
-  (require 'guix-repl)
-  (guix-apply-manifest-sync guix-init-profile guix-init-manifest)
-  (guix-emacs-add-profile guix-init-profile)
-  (guix-emacs-autoload-packages))
+  (defun guix-emacs-update-packages (pkgs)
+    "Sync the init profile and autoload all PKGS."
+    (interactive (list init-packages))
+    (guix-emacs-build-profile guix-init-profile pkgs)
+    (guix-emacs-add-profile guix-init-profile)
+    (guix-emacs-autoload-packages))
+
+  (when (not (equal init-packages (guix-emacs-profile-packages guix-init-profile)))
+    (guix-emacs-update-packages init-packages)))
 
 ;; ** Straight
-(defun read-first (fname)
-  "Read first object from file FNAME."
-  (with-temp-buffer
-    (insert-file-contents fname)
-    (read (current-buffer))))
-
-(defun straight-update-packages ()
-  "Sync straight with the packages list and autoload all packages."
-  (dolist (pkg (cadr (read-first packages-file)))
-    (straight-use-package pkg)))
+(defun straight-update-packages (pkgs)
+  "Sync straight with the PKGS list and autoload all packages."
+  (seq-do #'straight-use-package pkgs))
 
 ;; * Environment
 (require 'setup)
 
 (setup init/bootstrap
-  (:require xdg seq subr-x)
+  (:require xdg subr-x)
 
   (when (string-equal system-type "darwin")
     (:require exec-path-from-shell)
@@ -128,6 +155,12 @@ package name of the first minor mode."
                    `(-> ,init-var ,form))
                  forms)
        ,init-var)))
+
+(defun read-first (fname)
+  "Read first object from file FNAME."
+  (with-temp-buffer
+    (insert-file-contents fname)
+    (read (current-buffer))))
 
 (defun rotate-left (vs)
   "Rotate VS by one element."
