@@ -271,6 +271,9 @@ package name of the first minor mode."
   (set-face-attribute 'mode-line-inactive nil :box nil)
 
   (:option
+   ;; get custom out of the way
+   custom-file (expand-file-name ".__custom" user-emacs-directory)
+
    ;; truncate minibuffer display
    message-truncate-lines t
 
