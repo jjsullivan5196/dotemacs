@@ -1,89 +1,28 @@
 ;;; init.el --- my init file -*- lexical-binding: t; -*-
 ;;;
 ;;; Commentary:
-;;; loads my packages
+;;;
+;;; Loads my packages.
 ;;;
 ;;; Code:
-;; * Loading packages
-(setq init-packages '(guix setup exec-path-from-shell which-key
-                           hydra project projectile magit vterm
-                           w3m vertico marginalia orderless
-                           consult embark company
-                           frames-only-mode undo-tree wgrep
-                           yasnippet outshine yaml-mode
-                           markdown-mode rainbow-delimiters
-                           smartparens flycheck eglot
-                           expand-region nix-mode geiser-guile
-                           geiser racket-mode cider
-                           typescript-mode php-mode web-mode
-                           restclient go-mode lua-mode))
-
-(require 'seq)
-
-;; ** Guix
-(when (require 'guix-repl nil t)
-  (defvar guix-init-profile
-    (expand-file-name "init-package-profile" user-emacs-directory))
-
-  (defun guix-emacs-profile-packages (profile)
-    "Get the emacs packages installed in PROFILE."
-    (let* ((script `(begin
-                     (use-modules (guix profiles))
-                     (manifest->code (profile-manifest ,profile))))
-           ;; god why
-           (manifest (cdr (cadadr (guix-eval-read (prin1-to-string script)))))
-           (pkgs (mapcar (lambda (s)
-                           (intern (seq-subseq s 6)))
-                         (seq-filter (apply-partially #'string-match "^emacs-.*")
-                                     manifest))))
-      pkgs))
-
-  (defun guix-emacs-add-profile (profile)
-    "Add PROFILE to the load path."
-    (interactive (list guix-init-profile))
-    (let ((site-lisp (expand-file-name "share/emacs/site-lisp" profile)))
-      (add-to-list 'load-path site-lisp)
-      (load (expand-file-name "subdirs" site-lisp))))
-
-  (defun guix-emacs-build-profile (profile pkgs)
-    "Update PROFILE with the packages in PKGS, return when the new profile is ready."
-    (let* ((specs (mapcar (apply-partially #'format "emacs-%s") pkgs))
-           (script `(begin
-                     (use-modules (guix store)
-                                  (guix scripts package)
-                                  (gnu packages))
-                     (with-profile-lock
-                      ,profile
-                      (build-and-use-profile
-                       (open-connection)
-                       ,profile
-                       (specifications->manifest (list "emacs" ,@specs)))))))
-      (guix-eval-read (prin1-to-string script))))
-
-  (defun guix-emacs-update-packages (pkgs)
-    "Sync the init profile and autoload all PKGS."
-    (interactive (list init-packages))
-    (guix-emacs-build-profile guix-init-profile pkgs)
-    (guix-emacs-add-profile guix-init-profile)
-    (guix-emacs-autoload-packages))
-
-  (when (not (equal init-packages (guix-emacs-profile-packages guix-init-profile)))
-    (guix-emacs-update-packages init-packages)))
-
-;; ** Straight
-(defun straight-update-packages (pkgs)
-  "Sync straight with the PKGS list and autoload all packages."
-  (seq-do #'straight-use-package pkgs))
-
 ;; * Environment
-(require 'setup)
+(require 'setup-init)
 
-(setup init/bootstrap
-  (:require xdg subr-x)
+(setup init-bootstrap
+  (:packages guix setup exec-path-from-shell which-key hydra project
+             projectile magit vterm w3m vertico marginalia orderless
+             consult embark company frames-only-mode undo-tree wgrep
+             yasnippet outshine yaml-mode markdown-mode
+             rainbow-delimiters smartparens flycheck eglot
+             expand-region nix-mode geiser-guile geiser racket-mode
+             cider typescript-mode php-mode web-mode restclient
+             go-mode lua-mode)
 
   (when (string-equal system-type "darwin")
     (:require exec-path-from-shell)
     (exec-path-from-shell-initialize))
+
+  (:require subr-x)
 
   (put 'thread-first 'lisp-indent-function nil)
   (put 'thread-last 'lisp-indent-function nil)
@@ -91,55 +30,6 @@
   (defalias '-> 'thread-first)
   (defalias '->> 'thread-last)
   (defalias 'do 'progn))
-
-(setup setup/extras
-  (defun set-both (name x)
-    "Bind NAME to X in both namespaces."
-    (set name x)
-    (fset name x))
-
-  (setup-define :keymap
-    (lambda (name)
-      `(set-both ',name (make-sparse-keymap)))
-    :documentation "Set NAME to a new keymap."
-    :repeatable t)
-
-  (setup-define :minor-mode
-    (lambda (name &rest minor-mode-opts)
-      (let ((mode-map (intern (concat (symbol-name name) "-map"))))
-	      `(progn
-	         (set-both ',mode-map (make-sparse-keymap))
-	         (define-minor-mode ,name
-	           ,@minor-mode-opts
-	           :keymap ,mode-map)
-	         (provide ',name))))
-    :documentation "Create a minor mode NAME, with a corresponding keymap.
-
-MINOR-MODE-OPTS will be passed to `define-minor-mode'. This macro
-can be used as NAME, and will replace itself with the name of the
-new minor mode."
-    :shorthand #'cadr
-    :indent 1)
-
-  (setup-define :hydra
-    (lambda (name opts &rest defs)
-      `(defhydra ,name (,(setup-get 'map) ,@opts)
-         ,@defs))
-    :documentation "Bind a new hydra using the local keymap."
-    :indent 2)
-
-  (setup-define :use-global-mode
-    (lambda (name)
-      (let ((mode (if (string-match-p "-mode\\'" (symbol-name name))
-                      name
-                    (intern (format "%s-mode" name)))))
-        `(,mode t)))
-    :documentation "Activate a global minor mode by NAME.
-
-This macro can be used as NAME, and will replace itself with the
-package name of the first minor mode."
-    :repeatable t
-    :shorthand #'cadr))
 
 ;; * Helping hands
 (defmacro comment (&rest _)
@@ -269,6 +159,8 @@ package name of the first minor mode."
   ;; flat modeline
   (set-face-attribute 'mode-line nil :box nil)
   (set-face-attribute 'mode-line-inactive nil :box nil)
+
+  (:require xdg)
 
   (:option
    ;; get custom out of the way
