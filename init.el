@@ -12,7 +12,7 @@
   (:packages guix setup exec-path-from-shell which-key hydra project
              projectile magit vterm w3m vertico marginalia orderless
              consult embark company frames-only-mode undo-tree wgrep
-             yasnippet outshine yaml-mode markdown-mode
+             yasnippet outline-magic outshine yaml-mode markdown-mode
              rainbow-delimiters smartparens flycheck eglot
              expand-region nix-mode geiser-guile geiser racket-mode
              cider typescript-mode php-mode web-mode restclient
@@ -32,6 +32,7 @@
   (defalias 'do 'progn))
 
 ;; * Helping hands
+;; ** General
 (defmacro comment (&rest _)
   "Ignore anything inside here."
   nil)
@@ -46,23 +47,6 @@
                  forms)
        ,init-var)))
 
-(defun read-first (fname)
-  "Read first object from file FNAME."
-  (with-temp-buffer
-    (insert-file-contents fname)
-    (read (current-buffer))))
-
-(defun rotate-left (vs)
-  "Rotate VS by one element."
-  (append (cdr vs)
-          (-> (car vs)
-              list)))
-
-(defun unbind-all (sym)
-  "Remove all bindings from SYM."
-  (fmakunbound sym)
-  (makunbound sym))
-
 (defun run-command (command)
   "Run COMMAND in separate shell."
   (interactive (list (read-shell-command "$ ")))
@@ -74,10 +58,20 @@
      (interactive)
      (run-command ,cmdline)))
 
-(defun edit-user-config ()
-  "Edit the main configuration file."
-  (interactive)
-  (find-file user-init-file))
+(defun rotate-left (vs)
+  "Rotate VS by one element."
+  (append (cdr vs)
+          (-> (car vs)
+              list)))
+
+(defun juxt* (fns &rest args)
+  "Apply list of functions FNS to ARGS, return a list of corresponding results."
+  (mapcar (lambda (f) (apply f args)) fns))
+
+(defun unbind-all (sym)
+  "Remove all bindings from SYM."
+  (fmakunbound sym)
+  (makunbound sym))
 
 (defun save-file (fname)
   "Save any change to file at path FNAME."
@@ -87,13 +81,44 @@
     (save-buffer)
     (set-window-configuration config)))
 
-(defun config-reinit ()
+;; ** Read/Print
+(defun spit (obj fname)
+  "Serialize OBJ and write it to file FNAME."
+  (with-temp-buffer
+    (print obj (current-buffer))
+    (write-file fname)))
+
+(defun read-first (fname)
+  "Read first object from file FNAME."
+  (with-temp-buffer
+    (insert-file-contents fname)
+    (read (current-buffer))))
+
+(defun buffer-lines (buf)
+  "Return all lines in BUF as a list."
+  (save-excursion
+    (with-current-buffer buf
+      (end-of-buffer)
+      (set 'buf-lines '()) ;;(list (thing-at-point 'line t)))
+      (while (not (bobp))
+        (forward-line -1)
+        (set 'buf-lines (cons (thing-at-point 'line t) buf-lines)))
+      buf-lines)))
+
+;; ** Init related
+(defun edit-user-init ()
+  "Edit `user-init-file'."
+  (interactive)
+  (find-file user-init-file))
+
+(defun reload-user-init ()
   "Reload init."
   (interactive)
   (doto user-init-file
     save-file
     load))
 
+;; ** Editing commands
 (defun bookmark-jump-nosave (bookmark)
   "Interactively jump to BOOKMARK without saving the window configuration."
   (interactive
@@ -111,27 +136,6 @@
   "Run `indent-region` on the entire buffer."
   (interactive)
   (indent-region (point-min) (point-max)))
-
-(defun juxt* (fns &rest args)
-  "Apply list of functions FNS to ARGS, return a list of corresponding results."
-  (mapcar (lambda (f) (apply f args)) fns))
-
-(defun spit (obj fname)
-  "Serialize OBJ and write it to file FNAME."
-  (with-temp-buffer
-    (print obj (current-buffer))
-    (write-file fname)))
-
-(defun buffer-lines (buf)
-  "Return all lines in BUF as a list."
-  (save-excursion
-    (with-current-buffer buf
-      (end-of-buffer)
-      (set 'buf-lines '()) ;;(list (thing-at-point 'line t)))
-      (while (not (bobp))
-        (forward-line -1)
-        (set 'buf-lines (cons (thing-at-point 'line t) buf-lines)))
-      buf-lines)))
 
 ;; * The Journal
 (comment
@@ -220,8 +224,8 @@
    "C--" text-scale-decrease
    "C-+" (lambda nil (interactive) (text-scale-set 0))
    ;; Config
-   "<f9>" config-reinit
-   "<f12>" edit-user-config
+   "<f9>" reload-user-init
+   "<f12>" edit-user-init
    ;; Leader
    "M-SPC" leader-command-map)
 
@@ -328,7 +332,9 @@
     "Actually clear eshell."
     (interactive)
     (let ((inhibit-read-only t))
-      (erase-buffer))))
+      (erase-buffer)))
+
+  (:option eshell-directory-name (expand-file-name "emacs/eshell" (xdg-cache-home))))
 
 ;; ** Innernet
 (setup web-search
@@ -414,6 +420,9 @@
          "C-s-k" sp-forward-barf-sexp
          "C-M-j" sp-backward-slurp-sexp
          "C-s-j" sp-backward-barf-sexp))
+
+(setup outshine
+  (:bind "<backtab>" outline-cycle))
 
 (setup paren
   (:when-loaded
@@ -513,6 +522,6 @@
 (setup lua-mode
   (:option lua-indent-level 2))
 
-;; * End
+;; ** End
 (provide 'init)
 ;;; init.el ends here

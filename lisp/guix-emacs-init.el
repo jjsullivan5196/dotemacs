@@ -52,7 +52,7 @@
                       (build-and-use-profile
                        (open-connection)
                        ,profile
-                       (specifications->manifest (list "emacs" ,@specs)))))))
+                       (specifications->manifest (list "pgtk-emacs-next" ,@specs)))))))
       (guix-eval-read (prin1-to-string script))))
 
   (defun guix-emacs-sync-packages (profile pkgs)
