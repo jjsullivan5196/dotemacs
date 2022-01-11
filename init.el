@@ -306,7 +306,9 @@
 ;; * Utilities
 ;; ** Workspaces
 (setup tramp
-  (:option tramp-persistency-file-name (expand-file-name "emacs/tramp" (xdg-cache-home))))
+  (:when-loaded
+   (:option tramp-persistency-file-name (expand-file-name "emacs/tramp" (xdg-cache-home))
+            (append tramp-remote-path) 'tramp-own-remote-path)))
 
 (setup dired
   (defun mime-open-file (path)
