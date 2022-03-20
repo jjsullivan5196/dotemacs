@@ -15,7 +15,7 @@
              yasnippet outline-magic outshine yaml-mode markdown-mode
              rainbow-delimiters smartparens flycheck eglot
              expand-region nix-mode geiser-guile geiser racket-mode
-             cider typescript-mode php-mode web-mode restclient
+             cider typescript-mode php-mode web-mode restclient pinentry
              go-mode lua-mode)
 
   (when (string-equal system-type "darwin")
@@ -30,6 +30,9 @@
   (defalias '-> 'thread-first)
   (defalias '->> 'thread-last)
   (defalias 'do 'progn))
+
+(setup (:require pinentry)
+  (pinentry-start))
 
 ;; * Helping hands
 ;; ** General
